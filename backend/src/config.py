@@ -246,6 +246,13 @@ class Config:
         self.cancellation_report_webhook_url = self._get_optional_env("CANCELLATION_REPORT_WEBHOOK_URL")
         self.cancellation_report_webhook_secret = self._get_optional_env("CANCELLATION_REPORT_WEBHOOK_SECRET")
 
+        # Task-completed webhooks (docs/webhooks.md). PUBLIC_API_URL is the API's public base URL;
+        # self-hosters on a private network may deliver to private targets, the hosted service must not.
+        self.public_api_url = (
+            self._get_optional_env("PUBLIC_API_URL") or "http://localhost:8000"
+        ).rstrip("/")
+        self.webhook_allow_private_targets = self._get_bool_env("WEBHOOK_ALLOW_PRIVATE_TARGETS", True)
+
         # Social publishing. Each provider needs an OAuth app registered by the
         # operator; users then connect their own accounts through that app.
         self.youtube_oauth_client_id = self._get_optional_env(
