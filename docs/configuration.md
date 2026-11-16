@@ -102,6 +102,15 @@ The backend can infer a default LLM from whichever API key is present, but setti
 | `MEDIA_STORAGE` | `local` | `s3` stores durable media in a private bucket; see [Media storage](media-storage.md) for configuration, retention and migration |
 | `CORS_ORIGINS` | `http://localhost:3107,http://sp.localhost:3107,http://supoclip.localhost:3107` | Allowed browser origins for backend requests, including direct browser video uploads |
 
+## Webhook Settings
+
+See [Task-completed webhook](webhooks.md).
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `PUBLIC_API_URL` | `http://localhost:8000` | Public API base URL used to build clip `download_url` links in webhook payloads |
+| `WEBHOOK_ALLOW_PRIVATE_TARGETS` | `true` | `false` requires `https` and rejects loopback/private/link-local targets |
+
 ## Analytics Settings
 
 SupoClip can send pageviews and custom product events to DataFast from the `frontend` app.
