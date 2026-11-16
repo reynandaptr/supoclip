@@ -118,7 +118,8 @@ backfill tasks completed while disabled (`enabled_since` moves forward). Unsigne
 
 The secret is generated server-side (`whsec_` + 32 random bytes, urlsafe). Rotating it replaces it.
 The secret is signed with whatever is current at send time (not snapshotted), so a rotation applies to
-pending retries.
+pending retries. Retries also use the user's current URL (the row's `url` is kept as history), not the
+one snapshotted at enqueue.
 
 ### Enqueue (worker)
 

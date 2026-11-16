@@ -15,8 +15,8 @@ A task that ends `error` or `cancelled` sends nothing, and neither do clip-studi
    Later the card shows only the last four characters.
 4. Press **Send test** to queue a `webhook.test` delivery. The card shows the last delivery's status.
 
-**Rotate secret** replaces the secret. Retries of an unsent delivery are signed with the secret
-that is current when they are sent, not the one at enqueue time. **Remove** deletes the webhook.
+**Rotate secret** replaces the secret. Retries of an unsent delivery go to the URL and are signed with the secret
+that are current when they are sent, not the ones at enqueue time. **Remove** deletes the webhook.
 
 ## Request
 
@@ -82,12 +82,15 @@ Python:
 import hashlib, hmac, time
 
 def verify(secret: str, timestamp: str, signature: str, raw_body: bytes) -> bool:
-    if abs(time.time() - int(timestamp)) > 300:
+    try:
+        if abs(time.time() - int(timestamp)) > 300:
+            return False
+        expected = "v1=" + hmac.new(
+            secret.encode(), timestamp.encode() + b"." + raw_body, hashlib.sha256
+        ).hexdigest()
+        return hmac.compare_digest(expected.encode(), signature.encode())
+    except (ValueError, UnicodeError):
         return False
-    expected = "v1=" + hmac.new(
-        secret.encode(), timestamp.encode() + b"." + raw_body, hashlib.sha256
-    ).hexdigest()
-    return hmac.compare_digest(expected, signature)
 ```
 
 Node:
@@ -115,7 +118,7 @@ function verify(secret, timestamp, signature, rawBody) {
   error) is retried. The request times out after 10 seconds and redirects are not followed, so
   answer `2xx` quickly and do the work afterwards.
 - Retry delays after failed attempt 1 to 7: 1 min, 5 min, 15 min, 1 h, 3 h, 6 h, 12 h. The 8th
-  failure marks the delivery `failed` (about 23 hours in total).
+  failure marks the delivery `failed` (about 22 hours in total).
 - Delivery is at-least-once. De-duplicate by `delivery_id`. A task that is resumed and completes
   again sends a new delivery (new `delivery_id`, same `task.id`).
 - A delivery is queued when the task completes; a cron (`deliver_webhooks`, every 15 seconds) sends
@@ -148,8 +151,13 @@ Set on the backend (API and worker):
 | `PUBLIC_API_URL` | `http://localhost:8000` | Public base URL of the API, used to build `download_url` (trailing `/` stripped). Set it to the address the receiver can reach |
 | `WEBHOOK_ALLOW_PRIVATE_TARGETS` | `true` | `true`: `http` and `https` URLs, any address except unspecified or multicast (the receiver may be on the same host or Docker network). `false`: `https` only, and loopback, private, link-local, multicast, reserved and unspecified addresses (IPv4 and IPv6) are rejected |
 
-The URL is checked when saved and again before every send, and the request connects to the address
+The URL's syntax is checked when saved. When private targets are off, the address is also checked
+when you save; it is always re-checked before every send, and the request connects to the address
 that was checked. URLs are limited to 2048 characters.
+
+If anyone besides you can sign up to your SupoClip, set `WEBHOOK_ALLOW_PRIVATE_TARGETS=false`;
+otherwise users can make the server probe internal addresses. The Docker Compose file passes both
+variables to the API and every worker (`PUBLIC_API_URL` defaults to `http://localhost:8000`).
 
 ## API
 
