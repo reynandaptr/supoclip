@@ -254,3 +254,29 @@ async def test_payload_queries(db_session):
         "duration", "virality_score", "workflow_role", "part_number",
     }
     assert await WebhookRepository.get_task_for_payload(db_session, str(uuid4())) is None
+
+
+async def test_cancelled_inflight_delivery_is_not_resurrected(db_session):
+    user_id = await _user(db_session)
+    await _config(db_session, user_id)
+    delivery_id, _ = await _delivery(db_session, user_id)
+
+    claimed = await WebhookRepository.claim_due(db_session)
+    assert [r["id"] for r in claimed] == [delivery_id]
+    await WebhookRepository.cancel_pending(db_session, user_id)
+    await db_session.commit()
+
+    await WebhookRepository.mark_attempt_failed(
+        db_session,
+        delivery_id,
+        attempts=1,
+        status_code=500,
+        error="boom",
+        retry_at=datetime.now(timezone.utc) + timedelta(minutes=1),
+    )
+    await db_session.commit()
+    assert await _status(db_session, delivery_id) == "cancelled"
+
+    await WebhookRepository.mark_delivered(db_session, delivery_id, status_code=200)
+    await db_session.commit()
+    assert await _status(db_session, delivery_id) == "cancelled"

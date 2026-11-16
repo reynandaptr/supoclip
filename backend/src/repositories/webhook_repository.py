@@ -241,7 +241,7 @@ class WebhookRepository:
                 UPDATE webhook_deliveries
                 SET status = 'delivered', attempts = attempts + 1, last_status_code = :status_code,
                     last_error = NULL, delivered_at = now()
-                WHERE id = :id
+                WHERE id = :id AND status = 'pending'
                 """
             ),
             {"id": delivery_id, "status_code": status_code},
@@ -267,7 +267,7 @@ class WebhookRepository:
                     last_error = :error,
                     status = CASE WHEN CAST(:retry_at AS TIMESTAMPTZ) IS NULL THEN 'failed' ELSE 'pending' END,
                     next_attempt_at = COALESCE(CAST(:retry_at AS TIMESTAMPTZ), next_attempt_at)
-                WHERE id = :id
+                WHERE id = :id AND status = 'pending'
                 """
             ),
             {
@@ -296,7 +296,7 @@ class WebhookRepository:
     @staticmethod
     async def mark_cancelled(db: AsyncSession, delivery_id: str) -> None:
         await db.execute(
-            text("UPDATE webhook_deliveries SET status = 'cancelled' WHERE id = :id"),
+            text("UPDATE webhook_deliveries SET status = 'cancelled' WHERE id = :id AND status = 'pending'"),
             {"id": delivery_id},
         )
 
