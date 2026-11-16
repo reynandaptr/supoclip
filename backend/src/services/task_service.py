@@ -56,6 +56,7 @@ from ..media.timeline import seconds_to_mmss
 from ..workflows.boundaries import cleanup_key
 from ..workflows.contracts import OUTLINE_VERSION, WorkflowSpec, workflow_spec_from_task
 from ..workflows.errors import WorkflowError
+from ..webhooks.service import WebhookService
 from ..media_storage import MediaStorage, media_work
 from ..utils.async_helpers import run_in_thread
 from ..repositories.media_repository import queue_delete, guard_source_creation
@@ -965,6 +966,10 @@ class TaskService(ClipEditingMixin):
                 stage_timings_json=json.dumps(stage_timings),
                 error_code="",
             )
+            try:
+                await WebhookService(self.db, self.config).enqueue_task_completed(task_id)
+            except Exception:
+                logger.exception("Webhook enqueue failed for task %s", task_id)
             await self._send_completion_notification_if_needed(
                 task_id=task_id,
                 clips_count=len(clip_ids),
