@@ -17,6 +17,7 @@ import { useCopyText } from "@/lib/copy-text";
 import { GITHUB_URL } from "@/lib/site";
 import { KeyClientSetup } from "@/components/mcp-setup";
 import { AssistantConnect } from "@/components/assistant-connect";
+import { WebhookSettingsCard } from "@/components/webhook-settings-card";
 
 const DOCS = [
   { labelKey: "docsMcp", href: `${GITHUB_URL}/blob/main/mcp/README.md` },
@@ -284,6 +285,8 @@ export default function ApiKeysPage() {
           )}
         </div>
       </section>
+
+      <WebhookSettingsCard />
 
       <Dialog open={createOpen} onOpenChange={handleCreateOpenChange}>
         <DialogContent className="sm:max-w-lg">

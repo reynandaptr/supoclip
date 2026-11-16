@@ -283,5 +283,28 @@
     "unsupported": "Belum didukung penuh (bahasa umum): ",
     "all": "Semua bahasa yang didukung ({count})",
     "fallback": "Karakter yang tidak ada memakai font cadangan dan bisa terlihat berbeda. Cakupan dicek dari file font ini; pratinjau caption untuk karakter yang jarang."
+  },
+  "webhook": {
+    "title": "Webhook",
+    "description": "SupoClip sends a signed POST to this URL when every clip of a task is ready.",
+    "urlLabel": "Webhook URL",
+    "urlPlaceholder": "https://example.com/supoclip-webhook",
+    "enabled": "Enabled",
+    "save": "Save",
+    "saving": "Saving…",
+    "sendTest": "Send test",
+    "rotate": "Rotate secret",
+    "remove": "Remove",
+    "secretNotice": "Copy this signing secret now. It won't be shown again.",
+    "copySecret": "Copy signing secret",
+    "secretHint": "Signing secret: {hint}",
+    "lastDelivery": "Last delivery: {status} ({code})",
+    "noDeliveries": "No deliveries yet",
+    "loadFailed": "Could not load the webhook.",
+    "saveFailed": "Could not save the webhook.",
+    "testQueued": "Test delivery queued",
+    "testFailed": "Could not send the test.",
+    "rotateFailed": "Could not rotate the secret.",
+    "removeFailed": "Could not remove the webhook."
   }
 }
