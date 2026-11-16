@@ -30,10 +30,6 @@ async def test_completion_enqueues_one_delivery(db_session, tmp_path):
     task_id, _ids, original = await make_task(db_session, tmp_path, count=0, status="queued")
     task = await TaskRepository.get_task_by_id(db_session, task_id)
     await WebhookService(db_session).save(task["user_id"], url="https://example.com/hook", enabled=True)
-    # process_task stamps a naive utcnow(); a database session zone other than UTC would shift it
-    # before enabled_since (set by save). Backdate the opt-in so the test checks wiring, not zones.
-    await db_session.execute(text("UPDATE user_webhooks SET enabled_since = now() - interval '1 day'"))
-    await db_session.commit()
     worker, _path, _info = setup_worker(db_session, tmp_path, original)
 
     await worker.process_task(task_id, "upload://input.mp4", "upload")

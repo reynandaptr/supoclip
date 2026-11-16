@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from subprocess import SubprocessError
 from typing import Dict, Any, Optional, Callable
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 import asyncio
 import copy
@@ -962,7 +962,7 @@ class TaskService(ClipEditingMixin):
             await self.task_repo.update_task_runtime_metadata(
                 self.db,
                 task_id,
-                completed_at=datetime.utcnow(),
+                completed_at=datetime.now(timezone.utc),
                 stage_timings_json=json.dumps(stage_timings),
                 error_code="",
             )
@@ -1077,7 +1077,7 @@ class TaskService(ClipEditingMixin):
             await self.task_repo.update_task_runtime_metadata(
                 self.db,
                 task_id,
-                completed_at=datetime.utcnow(),
+                completed_at=datetime.now(timezone.utc),
                 error_code=error_code,
             )
             capture_event(
