@@ -57,3 +57,21 @@ async def test_enqueue_error_does_not_fail_task(db_session, tmp_path, monkeypatc
 
     assert (await TaskRepository.get_task_by_id(db_session, task_id))["status"] == "completed"
     worker._send_completion_notification_if_needed.assert_awaited_once()
+
+
+async def test_enqueue_db_error_does_not_fail_task(db_session, tmp_path, monkeypatch):
+    task_id, _ids, original = await make_task(db_session, tmp_path, count=0, status="queued")
+    worker, _path, _info = setup_worker(db_session, tmp_path, original)
+
+    async def db_boom(self, task_id):
+        # A failing statement leaves the shared session in a failed transaction.
+        await self.db.execute(text("SELECT * FROM table_that_does_not_exist"))
+
+    monkeypatch.setattr(WebhookService, "enqueue_task_completed", db_boom)
+
+    await worker.process_task(task_id, "upload://input.mp4", "upload")
+
+    task = await TaskRepository.get_task_by_id(db_session, task_id)
+    assert task["status"] == "completed"
+    assert not task.get("error_code")
+    worker._send_completion_notification_if_needed.assert_awaited_once()

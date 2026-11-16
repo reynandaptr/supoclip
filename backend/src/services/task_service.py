@@ -970,6 +970,10 @@ class TaskService(ClipEditingMixin):
                 await WebhookService(self.db, self.config).enqueue_task_completed(task_id)
             except Exception:
                 logger.exception("Webhook enqueue failed for task %s", task_id)
+                try:
+                    await self.db.rollback()
+                except Exception:
+                    logger.exception("Webhook enqueue rollback failed for task %s", task_id)
             await self._send_completion_notification_if_needed(
                 task_id=task_id,
                 clips_count=len(clip_ids),
