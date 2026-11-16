@@ -182,3 +182,28 @@ async def test_unreadable_secret_counts_as_a_failed_attempt(db_session, monkeypa
         )
     ).mappings().one()
     assert dict(row) == {"status": "pending", "attempts": 1, "last_error": "webhook secret unreadable"}
+
+
+async def test_delivery_goes_to_the_current_url(db_session, monkeypatch):
+    user_id = (await create_user(db_session))["id"]
+    await WebhookRepository.upsert_config(
+        db_session, user_id, url="https://new.example.com/hook", enabled=True,
+        secret_enc=encrypt_setting_value(SECRET),
+    )
+    await WebhookRepository.insert_delivery(
+        db_session,
+        delivery_id=str(uuid4()),
+        user_id=user_id,
+        task_id=None,
+        event="webhook.test",
+        url="https://old.example.com/hook",
+        payload={"event": "webhook.test"},
+        task_completed_at=None,
+    )
+    await db_session.commit()
+    requests = _mock_client(monkeypatch, [204])
+
+    result = await delivery.deliver_webhooks({})
+
+    assert result["delivered"] == 1
+    assert requests[0].headers["host"] == "new.example.com"

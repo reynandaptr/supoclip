@@ -70,7 +70,26 @@ async def send_delivery(
     client: httpx.AsyncClient,
     allow_private: bool,
 ) -> DeliveryResult:
-    """POST one delivery to the address its host resolves to now (checked again before every send)."""
+    """POST one delivery to the address its host resolves to now (checked again before every send).
+
+    The whole send, name lookup included, shares one REQUEST_TIMEOUT_SECONDS deadline.
+    """
+    try:
+        return await asyncio.wait_for(
+            _send(row, secret=secret, client=client, allow_private=allow_private),
+            timeout=REQUEST_TIMEOUT_SECONDS,
+        )
+    except asyncio.TimeoutError as exc:
+        return DeliveryResult(False, None, _describe(exc))
+
+
+async def _send(
+    row: Mapping[str, Any],
+    *,
+    secret: str,
+    client: httpx.AsyncClient,
+    allow_private: bool,
+) -> DeliveryResult:
     try:
         target = await resolve_target(row["url"], allow_private=allow_private)
     except WebhookUrlError as exc:
@@ -97,11 +116,8 @@ async def send_delivery(
             headers=headers,
             extensions=extensions,
         )
-        response = await asyncio.wait_for(
-            client.send(request, follow_redirects=False, stream=True),
-            timeout=REQUEST_TIMEOUT_SECONDS,
-        )
-    except (httpx.HTTPError, httpx.InvalidURL, asyncio.TimeoutError) as exc:
+        response = await client.send(request, follow_redirects=False, stream=True)
+    except (httpx.HTTPError, httpx.InvalidURL) as exc:
         return DeliveryResult(False, None, _describe(exc))
     # The response body is never read: only the status matters.
     await response.aclose()
@@ -111,19 +127,23 @@ async def send_delivery(
     return DeliveryResult(False, response.status_code, f"HTTP {response.status_code}")
 
 
-async def _current_secrets(db, user_ids: set[str]) -> dict[str, Optional[str]]:
-    """user_id -> decrypted secret, "" when it can't be decrypted; users without an enabled webhook are absent."""
-    secrets: dict[str, Optional[str]] = {}
+async def _current_configs(db, user_ids: set[str]) -> dict[str, dict[str, str]]:
+    """user_id -> {"url", "secret"} as saved now; secret is "" when it can't be decrypted.
+
+    Users without an enabled webhook are absent.
+    """
+    configs: dict[str, dict[str, str]] = {}
     for user_id in user_ids:
         cfg = await WebhookRepository.get_config(db, user_id)
         if cfg is None or not cfg["enabled"]:
             continue
         try:
-            secrets[user_id] = decrypt_setting_value(cfg["secret_enc"])
+            secret = decrypt_setting_value(cfg["secret_enc"])
         except Exception:
             logger.warning("Webhook secret for user %s could not be decrypted", user_id)
-            secrets[user_id] = ""
-    return secrets
+            secret = ""
+        configs[user_id] = {"url": cfg["url"], "secret": secret}
+    return configs
 
 
 async def _record_failure(db, row: Mapping[str, Any], result: DeliveryResult) -> None:
@@ -157,18 +177,19 @@ async def deliver_webhooks(ctx: dict) -> dict:
         rows = await WebhookRepository.claim_due(db, limit=CLAIM_LIMIT)
         await db.commit()
 
-        secrets = await _current_secrets(db, {row["user_id"] for row in rows}) if rows else {}
+        configs = await _current_configs(db, {row["user_id"] for row in rows}) if rows else {}
         sendable = []
         unreadable = []
         for row in rows:
-            secret = secrets.get(row["user_id"])
-            if secret is None:
+            cfg = configs.get(row["user_id"])
+            if cfg is None:
                 # Webhook removed or switched off since this was queued: never send it unsigned.
                 await WebhookRepository.mark_cancelled(db, row["id"])
-            elif secret == "":
+            elif cfg["secret"] == "":
                 unreadable.append(row)
             else:
-                sendable.append((row, secret))
+                # Retries go to the current URL and secret; the row's own url stays as history.
+                sendable.append(({**row, "url": cfg["url"]}, cfg["secret"]))
         await db.commit()
 
         results: list[DeliveryResult] = []
@@ -179,6 +200,8 @@ async def deliver_webhooks(ctx: dict) -> dict:
             async with httpx.AsyncClient(
                 timeout=REQUEST_TIMEOUT_SECONDS,
                 follow_redirects=False,
+                # Never route a pinned-IP request through a proxy from the environment.
+                trust_env=False,
                 # Pinned connections are keyed by IP; never reuse one for another host name.
                 limits=httpx.Limits(max_keepalive_connections=0),
             ) as client:

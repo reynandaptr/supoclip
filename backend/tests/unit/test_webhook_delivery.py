@@ -162,3 +162,35 @@ async def test_blocked_resolution_is_never_sent(monkeypatch):
 
 def test_module_exports_the_cron_entry_point():
     assert asyncio.iscoroutinefunction(delivery.deliver_webhooks)
+
+
+async def test_hanging_receiver_times_out(monkeypatch):
+    _patch_resolution(monkeypatch, PUBLIC_IP)
+    monkeypatch.setattr(delivery, "REQUEST_TIMEOUT_SECONDS", 0.1)
+
+    async def hang(request):
+        await asyncio.sleep(5)
+        return httpx.Response(200)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(hang), timeout=10) as client:
+        result = await send_delivery(_row(), secret=SECRET, client=client, allow_private=False)
+
+    assert result.ok is False
+    assert result.status_code is None
+    assert "timed out" in result.error
+
+
+async def test_slow_dns_counts_inside_the_deadline(monkeypatch):
+    async def slow(self, host, port, **kwargs):
+        await asyncio.sleep(5)
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (PUBLIC_IP, port))]
+
+    monkeypatch.setattr(asyncio.BaseEventLoop, "getaddrinfo", slow)
+    monkeypatch.setattr(delivery, "REQUEST_TIMEOUT_SECONDS", 0.1)
+    recorder = _Recorder(lambda request: httpx.Response(200))
+    async with _client(recorder) as client:
+        result = await send_delivery(_row(), secret=SECRET, client=client, allow_private=False)
+
+    assert result.ok is False
+    assert "timed out" in result.error
+    assert recorder.requests == []
