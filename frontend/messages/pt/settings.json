@@ -285,6 +285,8 @@
     "fallback": "Caracteres ausentes usam uma fonte reserva e podem ficar diferentes. A cobertura é verificada neste arquivo de fonte; pré-visualize as legendas para caracteres incomuns."
   },
   "webhook": {
+    "secretUnreadable": "The signing secret can't be read. Rotate it to keep deliveries working.",
+    "retry": "Retry",
     "title": "Webhook",
     "description": "SupoClip sends a signed POST to this URL when every clip of a task is ready.",
     "urlLabel": "Webhook URL",

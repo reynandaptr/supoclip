@@ -17,7 +17,7 @@ from ..repositories.webhook_repository import WebhookRepository
 from ..runtime_settings import decrypt_setting_value, encrypt_setting_value
 from .payload import build_task_completed_payload, build_test_payload
 from .signing import generate_secret
-from .url_safety import validate_webhook_url
+from .url_safety import resolve_target, validate_webhook_url
 
 logger = logging.getLogger(__name__)
 
@@ -32,27 +32,37 @@ class WebhookService:
         self.config = config or get_config()
         self.repo = WebhookRepository
 
-    def _hint(self, secret_enc: str) -> str:
-        return decrypt_setting_value(secret_enc)[-_HINT_LENGTH:]
+    def _hint(self, secret_enc: str) -> Optional[str]:
+        try:
+            return decrypt_setting_value(secret_enc)[-_HINT_LENGTH:]
+        except Exception:
+            logger.warning("Webhook secret could not be decrypted")
+            return None
 
     async def get_settings(self, user_id: str) -> Dict[str, Any]:
         cfg = await self.repo.get_config(self.db, user_id)
         if cfg is None:
             return {"configured": False}
-        return {
+        hint = self._hint(cfg["secret_enc"])
+        settings: Dict[str, Any] = {
             "configured": True,
             "url": cfg["url"],
             "enabled": cfg["enabled"],
-            "secret_hint": self._hint(cfg["secret_enc"]),
+            "secret_hint": hint,
             "created_at": cfg["created_at"],
             "updated_at": cfg["updated_at"],
             "last_delivery": await self.repo.last_delivery(self.db, user_id),
         }
+        if hint is None:
+            settings["secret_unreadable"] = True
+        return settings
 
     async def save(self, user_id: str, *, url: str, enabled: bool) -> Dict[str, Any]:
-        clean_url = validate_webhook_url(
-            url, allow_private=self.config.webhook_allow_private_targets
-        )
+        allow_private = self.config.webhook_allow_private_targets
+        clean_url = validate_webhook_url(url, allow_private=allow_private)
+        if not allow_private:
+            # Blocked addresses are refused now, not only at the first send.
+            await resolve_target(clean_url, allow_private=False)
         existing = await self.repo.get_config(self.db, user_id)
         secret: Optional[str] = None
         secret_enc: Optional[str] = None

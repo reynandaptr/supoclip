@@ -166,3 +166,34 @@ async def test_send_test_inserts_webhook_test_event(db_session):
     assert rows[0]["id"] == delivery_id
     assert rows[0]["event"] == "webhook.test"
     assert rows[0]["task_id"] is None
+
+
+async def test_unreadable_secret_does_not_break_settings(db_session):
+    user_id = await _user(db_session)
+    service = WebhookService(db_session)
+    await service.save(user_id, url=URL, enabled=True)
+    await db_session.execute(
+        text("UPDATE user_webhooks SET secret_enc = 'garbage' WHERE user_id = :u"), {"u": user_id}
+    )
+    await db_session.commit()
+    settings = await service.get_settings(user_id)
+    assert settings["configured"] is True
+    assert settings["secret_hint"] is None
+    assert settings["secret_unreadable"] is True
+    assert await service.rotate_secret(user_id) is not None
+    assert "secret_unreadable" not in await service.get_settings(user_id)
+
+
+async def test_save_checks_address_when_private_targets_off(db_session):
+    from types import SimpleNamespace
+
+    from src.config import get_config
+
+    config = get_config()
+    off = SimpleNamespace(**{**vars(config), "webhook_allow_private_targets": False}) \
+        if hasattr(config, "__dict__") else None
+    service = WebhookService(db_session, off)
+    user_id = await _user(db_session)
+    with pytest.raises(WebhookUrlError):
+        await service.save(user_id, url="https://127.0.0.1/hook", enabled=True)
+    assert await service.get_settings(user_id) == {"configured": False}

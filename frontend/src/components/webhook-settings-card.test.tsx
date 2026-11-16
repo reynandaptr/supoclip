@@ -72,3 +72,25 @@ it("shows the server error for an invalid URL", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
   expect(await screen.findByText("URL must use https")).toBeInTheDocument();
 });
+
+it("a load error shows a retry instead of the empty form", async () => {
+  const fetchMock = vi.fn()
+    .mockResolvedValueOnce(json({ detail: "boom" }, 500))
+    .mockResolvedValueOnce(json(configured));
+  vi.stubGlobal("fetch", fetchMock);
+  render(<WebhookSettingsCard />);
+  expect(await screen.findByText("boom")).toBeInTheDocument();
+  expect(screen.queryByLabelText("Webhook URL")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+  expect(await screen.findByDisplayValue("https://example.com/hook")).toBeInTheDocument();
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+});
+
+it("an unreadable secret shows a notice and keeps Rotate and Remove", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
+    json({ ...configured, secret_hint: null, secret_unreadable: true })));
+  render(<WebhookSettingsCard />);
+  expect(await screen.findByText("The signing secret can't be read. Rotate it to keep deliveries working.")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Rotate secret" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Remove" })).toBeInTheDocument();
+});

@@ -24,7 +24,8 @@ interface WebhookState {
   configured: boolean;
   url?: string;
   enabled?: boolean;
-  secret_hint?: string;
+  secret_hint?: string | null;
+  secret_unreadable?: boolean;
   last_delivery?: LastDelivery | null;
 }
 
@@ -44,6 +45,7 @@ export function WebhookSettingsCard() {
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const apply = useCallback((data: WebhookState) => {
     setWebhook(data);
@@ -56,9 +58,10 @@ export function WebhookSettingsCard() {
       const response = await fetch("/api/webhooks", { cache: "no-store" });
       if (!response.ok) throw new Error(await errorDetail(response, t("webhook.loadFailed")));
       apply(await response.json());
+      setLoadError(null);
     } catch (err) {
-      setWebhook({ configured: false });
-      setError(err instanceof Error ? err.message : t("webhook.loadFailed"));
+      // Never show the empty form for a failed load: it would hide Rotate and Remove.
+      setLoadError(err instanceof Error ? err.message : t("webhook.loadFailed"));
     }
   }, [apply, t]);
 
@@ -136,7 +139,17 @@ export function WebhookSettingsCard() {
       </div>
 
       <div className="grid gap-4 border-t p-5">
-        {webhook === null ? (
+        {loadError ? (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="flex items-center justify-between gap-3">
+              <span>{loadError}</span>
+              <Button type="button" size="sm" variant="outline" onClick={() => { setLoadError(null); void load(); }}>
+                {t("webhook.retry")}
+              </Button>
+            </AlertDescription>
+          </Alert>
+        ) : webhook === null ? (
           <Skeleton className="h-12 w-full" />
         ) : (
           <>
@@ -144,6 +157,13 @@ export function WebhookSettingsCard() {
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
+            {webhook.secret_unreadable && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{t("webhook.secretUnreadable")}</AlertDescription>
               </Alert>
             )}
 

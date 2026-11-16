@@ -285,6 +285,8 @@
     "fallback": "Karakter yang tidak ada memakai font cadangan dan bisa terlihat berbeda. Cakupan dicek dari file font ini; pratinjau caption untuk karakter yang jarang."
   },
   "webhook": {
+    "secretUnreadable": "The signing secret can't be read. Rotate it to keep deliveries working.",
+    "retry": "Retry",
     "title": "Webhook",
     "description": "SupoClip sends a signed POST to this URL when every clip of a task is ready.",
     "urlLabel": "Webhook URL",

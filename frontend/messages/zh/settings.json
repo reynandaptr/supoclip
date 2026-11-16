@@ -285,6 +285,8 @@
     "fallback": "缺少的字符会用后备字体，看起来可能不一样。覆盖范围根据这个字体文件检查；少见字符请预览字幕。"
   },
   "webhook": {
+    "secretUnreadable": "The signing secret can't be read. Rotate it to keep deliveries working.",
+    "retry": "Retry",
     "title": "Webhook",
     "description": "SupoClip sends a signed POST to this URL when every clip of a task is ready.",
     "urlLabel": "Webhook URL",

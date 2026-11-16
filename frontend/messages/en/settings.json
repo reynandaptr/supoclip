@@ -285,6 +285,8 @@
     "fallback": "Missing characters use a fallback font and may look different. Coverage is checked from this font file; preview captions for uncommon characters."
   },
   "webhook": {
+    "secretUnreadable": "The signing secret can't be read. Rotate it to keep deliveries working.",
+    "retry": "Retry",
     "title": "Webhook",
     "description": "SupoClip sends a signed POST to this URL when every clip of a task is ready.",
     "urlLabel": "Webhook URL",
