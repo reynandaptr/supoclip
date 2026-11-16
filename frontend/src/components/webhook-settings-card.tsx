@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { useCopyText } from "@/lib/copy-text";
 
 interface LastDelivery {
@@ -183,7 +184,7 @@ export function WebhookSettingsCard() {
                 />
               </div>
               <div className="flex items-center gap-2">
-                <input id="webhook-enabled" type="checkbox" className="size-4 accent-primary" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} disabled={busy} />
+                <Switch id="webhook-enabled" checked={enabled} onCheckedChange={setEnabled} disabled={busy} />
                 <Label htmlFor="webhook-enabled">{t("webhook.enabled")}</Label>
               </div>
               <div className="flex flex-wrap gap-2">

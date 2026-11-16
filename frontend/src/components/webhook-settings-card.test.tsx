@@ -19,6 +19,11 @@ const configured = {
 beforeEach(() => {
   vi.resetAllMocks();
   vi.unstubAllGlobals();
+  vi.stubGlobal("ResizeObserver", class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  });
 });
 
 it("shows the empty form when unconfigured", async () => {

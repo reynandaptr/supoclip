@@ -18,6 +18,11 @@ vi.mock("@/lib/auth-client", () => ({
 beforeEach(() => {
   vi.resetAllMocks();
   vi.unstubAllGlobals();
+  vi.stubGlobal("ResizeObserver", class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  });
   mocks.verified = false;
   window.history.replaceState(null, "", "/settings/api-keys");
   vi.stubGlobal("fetch", vi.fn().mockImplementation(async (url: string) => new Response(JSON.stringify(
