@@ -253,6 +253,7 @@ CREATE TABLE IF NOT EXISTS webhook_deliveries (
     delivered_at     TIMESTAMPTZ
 );
 CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_due ON webhook_deliveries (next_attempt_at) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_user ON webhook_deliveries (user_id, created_at DESC);
 -- One delivery per completion, whichever path (fast enqueue or reconciler) gets there first.
 CREATE UNIQUE INDEX IF NOT EXISTS uq_webhook_deliveries_completion
     ON webhook_deliveries (task_id, event, task_completed_at) WHERE task_completed_at IS NOT NULL;
