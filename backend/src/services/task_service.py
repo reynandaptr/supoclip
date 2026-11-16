@@ -598,7 +598,7 @@ class TaskService(ClipEditingMixin):
             await self.task_repo.update_task_runtime_metadata(
                 self.db,
                 task_id,
-                started_at=started_at,
+                started_at=started_at.replace(tzinfo=timezone.utc),
                 cache_hit=cache_hit,
             )
 
