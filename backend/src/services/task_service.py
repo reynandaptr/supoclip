@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from subprocess import SubprocessError
 from typing import Dict, Any, Optional, Callable
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 import asyncio
 import copy
@@ -56,6 +56,7 @@ from ..media.timeline import seconds_to_mmss
 from ..workflows.boundaries import cleanup_key
 from ..workflows.contracts import OUTLINE_VERSION, WorkflowSpec, workflow_spec_from_task
 from ..workflows.errors import WorkflowError
+from ..webhooks.service import WebhookService
 from ..media_storage import MediaStorage, media_work
 from ..utils.async_helpers import run_in_thread
 from ..repositories.media_repository import queue_delete, guard_source_creation
@@ -597,7 +598,7 @@ class TaskService(ClipEditingMixin):
             await self.task_repo.update_task_runtime_metadata(
                 self.db,
                 task_id,
-                started_at=started_at,
+                started_at=started_at.replace(tzinfo=timezone.utc),
                 cache_hit=cache_hit,
             )
 
@@ -961,10 +962,18 @@ class TaskService(ClipEditingMixin):
             await self.task_repo.update_task_runtime_metadata(
                 self.db,
                 task_id,
-                completed_at=datetime.utcnow(),
+                completed_at=datetime.now(timezone.utc),
                 stage_timings_json=json.dumps(stage_timings),
                 error_code="",
             )
+            try:
+                await WebhookService(self.db, self.config).enqueue_task_completed(task_id)
+            except Exception:
+                logger.exception("Webhook enqueue failed for task %s", task_id)
+                try:
+                    await self.db.rollback()
+                except Exception:
+                    logger.exception("Webhook enqueue rollback failed for task %s", task_id)
             await self._send_completion_notification_if_needed(
                 task_id=task_id,
                 clips_count=len(clip_ids),
@@ -1072,7 +1081,7 @@ class TaskService(ClipEditingMixin):
             await self.task_repo.update_task_runtime_metadata(
                 self.db,
                 task_id,
-                completed_at=datetime.utcnow(),
+                completed_at=datetime.now(timezone.utc),
                 error_code=error_code,
             )
             capture_event(

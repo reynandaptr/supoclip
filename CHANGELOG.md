@@ -4,6 +4,10 @@ What changed in SupoClip for people using the product. Newest dates are first.
 
 Add a line here when a pull request changes something a user can see. Use **New**, **Improved**, **Fixed**, or **Under the hood**, describe the change in plain language, and link the pull request. Skip internal-only work, or fold it into one **Under the hood** line. Do not include customer names, email addresses, user IDs, or anything else private.
 
+## 2026-11-17
+
+- **New:** Settings → Agents & API has a Webhook card. Add a URL and SupoClip sends it a signed message as soon as every clip of a task is ready, listing each clip with a download link that keeps working. Use it to hand clips to your own uploader or automation. Send test checks the connection, and failed deliveries are retried for about a day. ([#1](https://github.com/reynandaptr/supoclip/pull/1))
+
 ## 2026-11-16
 
 - **Fixed:** Exporting a clip while its clips are being regenerated no longer hangs and then fails. You're asked to try again in a moment, and if the clip was replaced you're told it's gone. ([#419](https://github.com/FujiwaraChoki/supoclip/pull/419))

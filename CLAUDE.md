@@ -156,6 +156,7 @@ PostgreSQL 15. Schema in `init.sql`. Mixed naming conventions:
 | `src/services/social_service.py` | Account connections, publish/schedule, metrics refresh, AI performance context |
 | `src/repositories/social_repository.py` | `social_accounts`, `social_posts`, `social_post_metrics` SQL |
 | `src/api/routes/social.py` | `/social/*` routes |
+| `src/webhooks/` | Outbox + signed delivery of the `task.completed` webhook (`docs/webhooks.md`) |
 | `src/cancellation_reviews/` | Investigates every Stripe cancellation and reports it to the operator chat (`docs/cancellation-reviews.md`) |
 
 ## API Endpoints (routes in `api/routes/`)
@@ -179,6 +180,8 @@ PostgreSQL 15. Schema in `init.sql`. Mixed naming conventions:
 - `GET /tasks/{id}/clips/{clip_id}/export?preset=tiktok` — Export with platform preset
 - `GET /tasks/{id}/clips/zip` — Stream every existing clip as one ZIP, built on the fly (`clip_archive.py`); `GET .../clips/zip/preflight` runs the same checks first. One ZIP download per user at a time (Redis slot, 429)
 
+**Webhook (session auth only, like API keys):** `GET|PUT|DELETE /webhooks/`, `POST /webhooks/rotate-secret`, `POST /webhooks/test` — one signed `task.completed` POST per user URL (`docs/webhooks.md`)
+
 **Media:**
 - `GET /fonts`, `GET /transitions`, `GET /caption-templates`, `GET /broll/status`
 - `POST /upload` — Upload video file
@@ -193,7 +196,7 @@ PostgreSQL 15. Schema in `init.sql`. Mixed naming conventions:
 - `GET /social/performance/timeseries?days=30` — daily new views from metrics snapshots (Analytics chart)
 - `GET /social/media/{token}` — public token-gated clip stream for Instagram
 
-Worker crons (`workers/tasks.py`): every minute `dispatch_scheduled_social_posts`, hourly `refresh_social_metrics`.
+Worker crons (`workers/tasks.py`): every minute `dispatch_scheduled_social_posts`, hourly `refresh_social_metrics`; cron worker `deliver_webhooks` every 15 s.
 Post status flow: `scheduled → queued → publishing → published/failed/cancelled`.
 
 **API keys (programmatic access):**
@@ -301,6 +304,8 @@ SOCIAL_PUBLISHING_ACCESS=off         # Rollout gate: off (default) | admins (adm
 SOCIAL_PUBLISHING_ALLOWED_EMAILS=    # Comma-separated beta emails when access=admins
 STRIPE_CANCELLATION_WEBHOOK_SECRETS= # Cancellation reviews: acct_X:whsec_... per Stripe endpoint (API)
 CANCELLATION_REVIEWS_ENABLED=false   # Cron worker investigates cancellations and posts reports (docs/cancellation-reviews.md)
+PUBLIC_API_URL=http://localhost:8000 # Public API base; builds webhook download_url
+WEBHOOK_ALLOW_PRIVATE_TARGETS=true   # false: webhook URLs must be public https
 CANCELLATION_REPORT_WEBHOOK_URL=     # Signed operator-chat webhook (+ CANCELLATION_REPORT_WEBHOOK_SECRET)
 WORKFLOWS_ACCESS=admins              # Series/topic/recap/trailer + instructions: off | admins | all (self-host: all)
 WORKFLOWS_ALLOWED_EMAILS=            # Comma-separated beta emails when access=admins

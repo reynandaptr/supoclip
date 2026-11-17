@@ -283,5 +283,30 @@
     "unsupported": "Not fully supported (common languages): ",
     "all": "All supported languages ({count})",
     "fallback": "Missing characters use a fallback font and may look different. Coverage is checked from this font file; preview captions for uncommon characters."
+  },
+  "webhook": {
+    "secretUnreadable": "The signing secret can't be read. Rotate it to keep deliveries working.",
+    "retry": "Retry",
+    "title": "Webhook",
+    "description": "SupoClip sends a signed POST to this URL when every clip of a task is ready.",
+    "urlLabel": "Webhook URL",
+    "urlPlaceholder": "https://example.com/supoclip-webhook",
+    "enabled": "Enabled",
+    "save": "Save",
+    "saving": "Saving…",
+    "sendTest": "Send test",
+    "rotate": "Rotate secret",
+    "remove": "Remove",
+    "secretNotice": "Copy this signing secret now. It won't be shown again.",
+    "copySecret": "Copy signing secret",
+    "secretHint": "Signing secret: {hint}",
+    "lastDelivery": "Last delivery: {status} ({code})",
+    "noDeliveries": "No deliveries yet",
+    "loadFailed": "Could not load the webhook.",
+    "saveFailed": "Could not save the webhook.",
+    "testQueued": "Test delivery queued",
+    "testFailed": "Could not send the test.",
+    "rotateFailed": "Could not rotate the secret.",
+    "removeFailed": "Could not remove the webhook."
   }
 }

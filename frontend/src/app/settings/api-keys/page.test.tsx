@@ -18,11 +18,17 @@ vi.mock("@/lib/auth-client", () => ({
 beforeEach(() => {
   vi.resetAllMocks();
   vi.unstubAllGlobals();
+  vi.stubGlobal("ResizeObserver", class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  });
   mocks.verified = false;
   window.history.replaceState(null, "", "/settings/api-keys");
-  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ api_keys: [
-    { id: "key-1", name: "Existing key", key_prefix: "sk_test", created_at: null, last_used_at: null, revoked: false },
-  ] }), { status: 200 })));
+  vi.stubGlobal("fetch", vi.fn().mockImplementation(async (url: string) => new Response(JSON.stringify(
+    url === "/api/webhooks" ? { configured: false } : { api_keys: [
+      { id: "key-1", name: "Existing key", key_prefix: "sk_test", created_at: null, last_used_at: null, revoked: false },
+    ] }), { status: 200 })));
 });
 
 it("blocks creation but lets unverified users send a link and revoke an existing key", async () => {
