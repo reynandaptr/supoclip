@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ...auth_headers import get_authenticated_user_id
 from ...config import get_config
 from ...database import get_db
-from ...webhooks.service import WebhookService
+from ...webhooks.service import SendTaskError, WebhookService
 from ...webhooks.url_safety import WebhookUrlError
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
@@ -70,4 +70,16 @@ async def test_webhook(request: Request, db: AsyncSession = Depends(get_db)):
         raise HTTPException(
             status_code=409, detail="Webhook is not configured or disabled"
         )
+    return {"delivery_id": delivery_id}
+
+
+@router.post("/tasks/{task_id}/send")
+async def send_task_to_webhook(
+    task_id: str, request: Request, db: AsyncSession = Depends(get_db)
+):
+    user_id = _get_user_id(request)
+    try:
+        delivery_id = await WebhookService(db).send_task(user_id, task_id)
+    except SendTaskError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc))
     return {"delivery_id": delivery_id}

@@ -82,6 +82,14 @@
     "action": "Retry generation",
     "tooltip": "Retry {count, plural, one {# failed/cancelled generation} other {# failed/cancelled generations}}"
   },
+  "sendWebhook": {
+    "empty": "No completed generations in selection to send.",
+    "fallback": "Failed to send to your webhook",
+    "success": "{count, plural, one {Sent # task to your webhook.} other {Sent # tasks to your webhook.}}",
+    "partial": "{success} sent, {failed} failed. {error}",
+    "action": "Send to webhook",
+    "tooltip": "Send {count, plural, one {# completed task} other {# completed tasks}} to your webhook"
+  },
   "delete": {
     "empty": "Select at least one generation to delete.",
     "fallback": "Failed to delete generation",

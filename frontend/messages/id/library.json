@@ -82,6 +82,14 @@
     "action": "Coba pembuatan lagi",
     "tooltip": "Coba lagi {count} pembuatan yang gagal/dibatalkan"
   },
+  "sendWebhook": {
+    "empty": "No completed generations in selection to send.",
+    "fallback": "Failed to send to your webhook",
+    "success": "{count, plural, one {Sent # task to your webhook.} other {Sent # tasks to your webhook.}}",
+    "partial": "{success} sent, {failed} failed. {error}",
+    "action": "Send to webhook",
+    "tooltip": "Send {count, plural, one {# completed task} other {# completed tasks}} to your webhook"
+  },
   "delete": {
     "empty": "Pilih minimal satu generasi untuk dihapus.",
     "fallback": "Gagal menghapus generasi",

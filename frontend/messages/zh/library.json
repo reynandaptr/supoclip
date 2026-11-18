@@ -82,6 +82,14 @@
     "action": "重试生成",
     "tooltip": "重试 {count} 个失败或已取消的生成任务"
   },
+  "sendWebhook": {
+    "empty": "No completed generations in selection to send.",
+    "fallback": "Failed to send to your webhook",
+    "success": "{count, plural, one {Sent # task to your webhook.} other {Sent # tasks to your webhook.}}",
+    "partial": "{success} sent, {failed} failed. {error}",
+    "action": "Send to webhook",
+    "tooltip": "Send {count, plural, one {# completed task} other {# completed tasks}} to your webhook"
+  },
   "delete": {
     "empty": "请至少选择一次生成再删除。",
     "fallback": "删除生成失败",

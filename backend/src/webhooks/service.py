@@ -26,6 +26,24 @@ WEBHOOK_TEST = "webhook.test"
 _HINT_LENGTH = 4
 
 
+class SendTaskError(Exception):
+    """A task cannot be sent by hand. `status_code` is the HTTP status to answer."""
+
+    status_code = 409
+
+
+class TaskNotFound(SendTaskError):
+    status_code = 404
+
+
+class TaskNotCompleted(SendTaskError):
+    pass
+
+
+class WebhookNotReady(SendTaskError):
+    pass
+
+
 class WebhookService:
     def __init__(self, db: AsyncSession, config: Optional[Config] = None):
         self.db = db
@@ -103,6 +121,44 @@ class WebhookService:
             user_id=user_id,
             task_id=None,
             event=WEBHOOK_TEST,
+            url=cfg["url"],
+            payload=payload,
+            task_completed_at=None,
+        )
+        await self.db.commit()
+        return delivery_id
+
+    async def send_task(self, user_id: str, task_id: str) -> str:
+        """Queue a fresh task.completed delivery on request (manual resend).
+
+        Skips the enabled_since filter and stores task_completed_at NULL, so it
+        never collides with the automatic delivery's unique index.
+        """
+        task = await self.repo.get_task_for_payload(self.db, task_id)
+        if task is None or task["user_id"] != user_id:
+            raise TaskNotFound("Task not found")
+        if task["status"] != "completed":
+            raise TaskNotCompleted("Only completed tasks can be sent")
+        cfg = await self.repo.get_config(self.db, user_id)
+        if cfg is None or not cfg["enabled"]:
+            raise WebhookNotReady("Set up and enable the webhook first")
+
+        clips = await self.repo.get_clips_for_payload(self.db, task_id)
+        delivery_id = str(uuid4())
+        payload = build_task_completed_payload(
+            delivery_id=delivery_id,
+            created_at=datetime.now(timezone.utc),
+            task=task,
+            clips=clips,
+            public_api_url=self.config.public_api_url,
+            app_base_url=self.config.app_base_url,
+        )
+        await self.repo.insert_delivery(
+            self.db,
+            delivery_id=delivery_id,
+            user_id=user_id,
+            task_id=task_id,
+            event=TASK_COMPLETED,
             url=cfg["url"],
             payload=payload,
             task_completed_at=None,

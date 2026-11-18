@@ -180,7 +180,7 @@ PostgreSQL 15. Schema in `init.sql`. Mixed naming conventions:
 - `GET /tasks/{id}/clips/{clip_id}/export?preset=tiktok` — Export with platform preset
 - `GET /tasks/{id}/clips/zip` — Stream every existing clip as one ZIP, built on the fly (`clip_archive.py`); `GET .../clips/zip/preflight` runs the same checks first. One ZIP download per user at a time (Redis slot, 429)
 
-**Webhook (session auth only, like API keys):** `GET|PUT|DELETE /webhooks/`, `POST /webhooks/rotate-secret`, `POST /webhooks/test` — one signed `task.completed` POST per user URL (`docs/webhooks.md`)
+**Webhook (session auth only, like API keys):** `GET|PUT|DELETE /webhooks/`, `POST /webhooks/rotate-secret`, `POST /webhooks/test`, `POST /webhooks/tasks/{id}/send` (resend a completed task) — one signed `task.completed` POST per user URL (`docs/webhooks.md`)
 
 **Media:**
 - `GET /fonts`, `GET /transitions`, `GET /caption-templates`, `GET /broll/status`

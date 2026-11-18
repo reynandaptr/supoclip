@@ -130,6 +130,15 @@ function verify(secret, timestamp, signature, rawBody) {
 - Delivered, failed and cancelled rows are pruned after 30 days.
 - A webhook problem never fails or delays a task.
 
+## Sending a task again
+
+For tasks that finished before the webhook existed, or whose delivery failed: on the task list
+(`/list`), select completed tasks and press **Send to webhook**. Each one queues a new
+`task.completed` delivery with a new `delivery_id` (same `task.id`), carrying the task's clips as
+they are now. It needs a saved, enabled webhook, and it is sent even if the task completed before
+the webhook was enabled. Pressing it again sends again, so receivers must handle a task they have
+already seen.
+
 ## Download a clip
 
 `download_url` is stable (it does not expire). Fetch it with the API key from step 1:
@@ -163,4 +172,5 @@ variables to the API and every worker (`PUBLIC_API_URL` defaults to `http://loca
 
 Session-authenticated only (an API key is rejected), like `/api-keys`:
 `GET /webhooks/`, `PUT /webhooks/` (`{url, enabled}`), `POST /webhooks/rotate-secret`,
-`DELETE /webhooks/`, `POST /webhooks/test`.
+`DELETE /webhooks/`, `POST /webhooks/test`, `POST /webhooks/tasks/{id}/send` (409 unless the task is
+completed and the webhook is set up and enabled).

@@ -4,6 +4,10 @@ What changed in SupoClip for people using the product. Newest dates are first.
 
 Add a line here when a pull request changes something a user can see. Use **New**, **Improved**, **Fixed**, or **Under the hood**, describe the change in plain language, and link the pull request. Skip internal-only work, or fold it into one **Under the hood** line. Do not include customer names, email addresses, user IDs, or anything else private.
 
+## 2026-11-18
+
+- **New:** The task list can send completed tasks to your webhook again, for tasks that finished before the webhook was set up or whose delivery failed. ([#PR](https://github.com/reynandaptr/supoclip/pull/PR))
+
 ## 2026-11-17
 
 - **New:** Settings → Agents & API has a Webhook card. Add a URL and SupoClip sends it a signed message as soon as every clip of a task is ready, listing each clip with a download link that keeps working. Use it to hand clips to your own uploader or automation. Send test checks the connection, and failed deliveries are retried for about a day. ([#1](https://github.com/reynandaptr/supoclip/pull/1))

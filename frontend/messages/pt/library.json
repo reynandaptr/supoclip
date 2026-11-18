@@ -82,6 +82,14 @@
     "action": "Tentar geração novamente",
     "tooltip": "Tentar novamente {count, plural, one {# geração com falha/cancelada} other {# gerações com falha/canceladas}}"
   },
+  "sendWebhook": {
+    "empty": "No completed generations in selection to send.",
+    "fallback": "Failed to send to your webhook",
+    "success": "{count, plural, one {Sent # task to your webhook.} other {Sent # tasks to your webhook.}}",
+    "partial": "{success} sent, {failed} failed. {error}",
+    "action": "Send to webhook",
+    "tooltip": "Send {count, plural, one {# completed task} other {# completed tasks}} to your webhook"
+  },
   "delete": {
     "empty": "Selecione pelo menos uma geração para excluir.",
     "fallback": "Falha ao excluir a geração",

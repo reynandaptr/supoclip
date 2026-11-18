@@ -43,6 +43,7 @@ import {
   Loader2,
   PauseCircle,
   RotateCcw,
+  Send,
   Trash2,
   X,
 } from "lucide-react";
@@ -50,7 +51,7 @@ import Link from "next/link";
 
 type Task = GenerationSummary;
 
-type BatchAction = "cancel" | "retry" | "delete" | null;
+type BatchAction = "cancel" | "retry" | "sendWebhook" | "delete" | null;
 
 const fetchTasksList = fetchGenerations;
 
@@ -152,6 +153,7 @@ export default function ListPage() {
   const retryableCount = selectedTasks.filter((task) =>
     RETRYABLE_TASK_STATUSES.includes(task.status),
   ).length;
+  const sendableCount = selectedTasks.filter((task) => task.status === "completed").length;
   const allVisibleSelected = tasks.length > 0 && tasks.every((task) => selectedTaskIds.includes(task.id));
   const someSelected = selectedCount > 0 && !allVisibleSelected;
 
@@ -276,6 +278,25 @@ export default function ListPage() {
         fallback: t("retry.fallback"),
         success: (count) => t("retry.success", { count }),
         partial: (s, f, err) => t("retry.partial", { success: s, failed: f, error: err }),
+      },
+    );
+  };
+
+  const handleSendWebhookSelected = async () => {
+    const targetTaskIds = selectedTasks
+      .filter((task) => task.status === "completed")
+      .map((task) => task.id);
+
+    await runBatchAction(
+      "sendWebhook",
+      targetTaskIds,
+      (taskId) =>
+        fetch(`/api/webhooks/tasks/${encodeURIComponent(taskId)}/send`, { method: "POST" }),
+      {
+        empty: t("sendWebhook.empty"),
+        fallback: t("sendWebhook.fallback"),
+        success: (count) => t("sendWebhook.success", { count }),
+        partial: (s, f, err) => t("sendWebhook.partial", { success: s, failed: f, error: err }),
       },
     );
   };
@@ -554,6 +575,31 @@ export default function ListPage() {
                 </TooltipTrigger>
                 <TooltipContent side="top" sideOffset={8}>
                   {t("retry.tooltip", { count: retryableCount })}
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => void handleSendWebhookSelected()}
+                    disabled={sendableCount === 0 || activeBatchAction !== null}
+                    className="text-stone-300 hover:text-white hover:bg-stone-800 disabled:text-stone-600 disabled:hover:bg-transparent dark:hover:bg-stone-700 dark:disabled:text-stone-500"
+                  >
+                    {activeBatchAction === "sendWebhook" ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Send className="w-4 h-4" />
+                    )}
+                    <span className="hidden sm:inline">{t("sendWebhook.action")}</span>
+                    {sendableCount > 0 && (
+                      <span className="text-xs text-stone-500 dark:text-stone-400">{sendableCount}</span>
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top" sideOffset={8}>
+                  {t("sendWebhook.tooltip", { count: sendableCount })}
                 </TooltipContent>
               </Tooltip>
 
