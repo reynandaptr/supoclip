@@ -147,6 +147,7 @@ interface TaskDetails extends WorkflowTaskFields {
   clip_length?: string | null;
   add_subtitles?: boolean | null;
   error_code?: string | null;
+  failure_reason?: string | null;
 }
 
 // Params each note needs; a note missing one is not shown rather than shown half-filled.
@@ -200,7 +201,20 @@ export default function TaskPage() {
     ? t("failedBodyAgeRestricted")
     : task?.error_code === "youtube_geo_restricted"
       ? t("failedBodyGeoRestricted")
-      : t("failedBody");
+      : task?.error_code === "download_too_large"
+        ? t("failedBodyTooLarge")
+        : t("failedBody");
+  // The backend's own words for what went wrong. Restricted videos already say all of it.
+  const failureReason = task?.status === "error"
+    && task.error_code !== "youtube_age_restricted"
+    && task.error_code !== "youtube_geo_restricted"
+    ? task.failure_reason?.trim() || null
+    : null;
+  const failureDetail = failureReason ? (
+    <p className="mt-2 max-w-md break-words text-sm">
+      <span className="font-medium">{t("failedReason")}</span> {failureReason}
+    </p>
+  ) : null;
   // Next steps on the failure screen stay inside what this user may make.
   const workflowsInfo = useWorkflowsInfo(Boolean(failureCode));
   const [clips, setClips] = useState<Clip[]>([]);
@@ -1033,7 +1047,7 @@ export default function TaskPage() {
             onResume={handleResume}
           />
         ) : task.status === "error" && clips.length === 0 ? (
-          <EmptyState tone="error" icon={<AlertCircle className="size-7" />} title={t("failedTitle")} body={failedBody}>
+          <EmptyState tone="error" icon={<AlertCircle className="size-7" />} title={t("failedTitle")} body={failedBody} detail={failureDetail}>
             <Button asChild variant="outline"><Link href="/"><ArrowLeft className="size-4" />{t("backHome")}</Link></Button>
           </EmptyState>
         ) : clips.length === 0 ? (
@@ -1077,6 +1091,7 @@ export default function TaskPage() {
               <div role="status" className="mb-6 rounded-lg border border-destructive/20 bg-destructive/5 p-4">
                 <p className="font-medium">{t("failedTitle")}</p>
                 <p className="mt-1 text-sm text-muted-foreground">{failedBody}</p>
+                {failureDetail}
               </div>
             )}
                         {workflow === "topic" && topicName && (

@@ -258,6 +258,33 @@ describe("task page workflows", () => {
 
     expect(await screen.findByText(/age-restricted, so we can't download it/)).toBeInTheDocument();
     expect(screen.queryByText(/Retry generation to try again/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Reason:")).not.toBeInTheDocument();
+  });
+
+  it("shows why a generation failed", async () => {
+    serve(task({ status: "error", error_code: "task_error", failure_reason: "This VOD is private" }), []);
+    renderPage();
+
+    expect(await screen.findByText("This VOD is private")).toBeInTheDocument();
+    expect(screen.getByText("Reason:")).toBeInTheDocument();
+    expect(screen.getByText(/Retry generation to try again/)).toBeInTheDocument();
+  });
+
+  it("explains a video too large to download, with its sizes", async () => {
+    const reason = "The download reached 4.2 GB, over the 2.0 GB limit for one generation (YOUTUBE_DOWNLOAD_MAX_BYTES).";
+    serve(task({ status: "error", error_code: "download_too_large", failure_reason: reason }), []);
+    renderPage();
+
+    expect(await screen.findByText(/too large to download in one generation/)).toBeInTheDocument();
+    expect(screen.getByText(reason)).toBeInTheDocument();
+  });
+
+  it("shows no reason line when the backend has nothing specific", async () => {
+    serve(task({ status: "error", error_code: "task_error", failure_reason: null }), []);
+    renderPage();
+
+    expect(await screen.findByText(/Retry generation to try again/)).toBeInTheDocument();
+    expect(screen.queryByText("Reason:")).not.toBeInTheDocument();
   });
 
   it("keeps highlights sorted best first with a top pick", async () => {

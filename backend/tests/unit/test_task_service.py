@@ -1000,3 +1000,76 @@ def test_download_errors_keep_their_wording():
 
     assert user_facing_error(StreamSourceError("This VOD is private")) == "This VOD is private"
     assert user_facing_error(YouTubeGeoRestrictedError()) == str(YouTubeGeoRestrictedError())
+
+
+@pytest.mark.asyncio
+async def test_download_over_the_byte_limit_says_so_with_sizes():
+    from src.youtube_proxy import DownloadBudgetExceeded
+
+    service = build_task_service()
+    error = DownloadBudgetExceeded("over", limit=2_000_000_000, total=4_248_732_914)
+    service.video_service.process_video_complete.side_effect = error
+
+    with pytest.raises(DownloadBudgetExceeded):
+        await service.process_task(
+            task_id="task-1", url="https://www.youtube.com/watch?v=abcdefghijk",
+            source_type="youtube", user_id="user-1",
+        )
+
+    assert service.task_repo.update_task_runtime_metadata.await_args.kwargs["error_code"] == "download_too_large"
+    shown = service.task_repo.update_task_status.await_args.kwargs["progress_message"]
+    assert "4.2 GB" in shown and "2.0 GB" in shown
+    assert "YOUTUBE_DOWNLOAD_MAX_BYTES" in shown
+
+
+def test_byte_budget_error_carries_its_sizes():
+    from src.youtube_proxy import ByteBudget, DownloadBudgetExceeded
+
+    budget = ByteBudget(100)
+    budget.add(60)
+    with pytest.raises(DownloadBudgetExceeded) as raised:
+        budget.add(50)
+    assert (raised.value.limit, raised.value.total) == (100, 110)
+
+
+def test_budget_error_survives_pickling_for_the_job_result():
+    import pickle
+    from src.youtube_proxy import DownloadBudgetExceeded
+
+    copy = pickle.loads(pickle.dumps(DownloadBudgetExceeded("over", limit=1, total=2)))
+    assert str(copy) == "over"
+
+
+@pytest.mark.parametrize(
+    ("task", "reason"),
+    [
+        ({"status": "error", "progress_message": "This VOD is private"}, "This VOD is private"),
+        ({"status": "error", "progress_message": None}, None),
+        ({"status": "error", "progress_message": "  "}, None),
+        ({"status": "processing", "progress_message": "Downloading video..."}, None),
+        ({"status": "completed", "progress_message": "Done"}, None),
+    ],
+)
+def test_failure_reason_only_for_failed_tasks_with_a_message(task, reason):
+    from src.services.task_service import failure_reason
+
+    assert failure_reason(task) == reason
+
+
+def test_failure_reason_skips_the_generic_message():
+    from src.services.task_service import _GENERIC_ERROR, failure_reason
+
+    assert failure_reason({"status": "error", "progress_message": _GENERIC_ERROR}) is None
+
+
+@pytest.mark.asyncio
+async def test_task_details_include_the_failure_reason():
+    service = TaskService(db=AsyncMock())
+    task = {"id": "t", "status": "error", "progress_message": "This VOD is private"}
+    service.task_repo.get_task_by_id = AsyncMock(return_value=task)
+    service.clip_repo.get_clips_by_task = AsyncMock(return_value=[])
+    service._load_task_source_settings = AsyncMock(return_value={})
+
+    result = await service.get_task_with_clips("t")
+
+    assert result["failure_reason"] == "This VOD is private"

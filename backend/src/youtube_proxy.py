@@ -132,6 +132,11 @@ def _allowed_geo_countries(exc: BaseException) -> list[str]:
 class DownloadBudgetExceeded(YouTubeDownloadError):
     """The per-job byte limit was crossed."""
 
+    def __init__(self, message: str = "", *, limit: int = 0, total: int = 0):
+        super().__init__(message)
+        self.limit = limit
+        self.total = total
+
 
 class PartialDownloadUnavailable(YouTubeDownloadError):
     """The formats cannot be sliced without an ffmpeg network fetch."""
@@ -194,7 +199,9 @@ class ByteBudget:
             if self.limit and self.total > self.limit:
                 raise DownloadBudgetExceeded(
                     f"YouTube download exceeded the {self.limit} byte job limit "
-                    f"({self.total} bytes)"
+                    f"({self.total} bytes)",
+                    limit=self.limit,
+                    total=self.total,
                 )
 
     def snapshot(self) -> int:
