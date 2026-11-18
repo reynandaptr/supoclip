@@ -111,6 +111,12 @@ See [Task-completed webhook](webhooks.md).
 | `PUBLIC_API_URL` | `http://localhost:8000` | Public API base URL used to build clip `download_url` links in webhook payloads |
 | `WEBHOOK_ALLOW_PRIVATE_TARGETS` | `true` | `false` requires `https` and rejects loopback/private/link-local targets |
 
+## Clip Edit Settings
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `MANUAL_CLIP_EDITS_ENABLED` | `true` | `false` makes trim, split, merge, caption edit, regenerate and the synchronous preset export (`GET .../clips/{id}/export`) answer `403`. These re-encode video inside the API process; set `false` on hosts where all video work must run on remote workers ([render-worker.md](render-worker.md)). The clip studio's queued prepare/export/combine are unaffected. |
+
 ## Analytics Settings
 
 SupoClip can send pageviews and custom product events to DataFast from the `frontend` app.
