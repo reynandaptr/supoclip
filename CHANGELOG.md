@@ -6,7 +6,7 @@ Add a line here when a pull request changes something a user can see. Use **New*
 
 ## 2026-11-18
 
-- **New:** The task list can send completed tasks to your webhook again, for tasks that finished before the webhook was set up or whose delivery failed. ([#PR](https://github.com/reynandaptr/supoclip/pull/PR))
+- **New:** The task list can send completed tasks to your webhook again, for tasks that finished before the webhook was set up or whose delivery failed. ([webhook guide](https://github.com/reynandaptr/supoclip/blob/main/docs/webhooks.md#sending-a-task-again))
 
 ## 2026-11-17
 
