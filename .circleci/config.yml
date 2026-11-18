@@ -1,0 +1,162 @@
+version: 2.1
+
+# Builds SupoClip's images to GHCR and deploys the Dokploy compose (deploy/dokploy/compose.yml).
+#   supoclip-backend       CPU build: API, AI worker and scheduler on the VPS
+#   supoclip-backend-cuda  CUDA build: the GPU video worker on WSL (deploy/wsl-worker), pulled by its timer
+#   supoclip-frontend      Next.js runner, built for the reynandaptr.dev hosts
+# Same setup as reynandaptr/apps. Runtime secrets live in Dokploy, not here.
+
+orbs:
+  slack: circleci/slack@6.1.2
+
+executors:
+  builder:
+    machine:
+      image: ubuntu-2404:current
+      docker_layer_caching: true
+    working_directory: ~/supoclip
+  shell:
+    docker:
+      - image: cimg/base:current
+
+commands:
+  notify-slack:
+    description: "Slack notify on pass/fail (requires SLACK_ACCESS_TOKEN + SLACK_DEFAULT_CHANNEL)"
+    steps:
+      - slack/notify:
+          event: fail
+          template: basic_fail_1
+      - slack/notify:
+          event: pass
+          template: basic_success_1
+
+  ghcr-login:
+    description: "Login to GitHub Container Registry"
+    steps:
+      - run:
+          name: Login to GHCR
+          command: echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
+
+  buildx-init:
+    description: "Set up Docker buildx with a builder that supports cache export"
+    steps:
+      - run:
+          name: Set up Docker buildx
+          command: |
+            docker buildx create --name supoclip-builder --driver docker-container --use 2>/dev/null \
+              || docker buildx use supoclip-builder
+            docker buildx inspect --bootstrap
+
+jobs:
+  build-backend:
+    executor: builder
+    parameters:
+      image:
+        type: string
+      cpu_only:
+        type: string
+    steps:
+      - checkout
+      - ghcr-login
+      - buildx-init
+      - run:
+          name: Build and push << parameters.image >>
+          command: |
+            set -euo pipefail
+            IMAGE_NAME="ghcr.io/reynandaptr/<< parameters.image >>"
+            docker buildx build \
+              --file backend/Dockerfile \
+              --platform linux/amd64 \
+              --build-arg BACKEND_CPU_ONLY=<< parameters.cpu_only >> \
+              --push \
+              --cache-from "type=registry,ref=${IMAGE_NAME}:buildcache" \
+              --cache-to   "type=registry,ref=${IMAGE_NAME}:buildcache,mode=max" \
+              --tag "${IMAGE_NAME}:latest" \
+              --tag "${IMAGE_NAME}:${CIRCLE_SHA1}" \
+              backend
+      - notify-slack
+
+  build-frontend:
+    executor: builder
+    steps:
+      - checkout
+      - ghcr-login
+      - buildx-init
+      - run:
+          name: Build and push supoclip-frontend
+          command: |
+            set -euo pipefail
+            IMAGE_NAME="ghcr.io/reynandaptr/supoclip-frontend"
+            docker buildx build \
+              --file frontend/Dockerfile \
+              --target runner \
+              --platform linux/amd64 \
+              --build-arg NEXT_PUBLIC_API_URL=https://supoclip-api.reynandaptr.dev \
+              --build-arg NEXT_PUBLIC_APP_URL=https://supoclip.reynandaptr.dev \
+              --build-arg NEXT_PUBLIC_SELF_HOST=true \
+              --push \
+              --cache-from "type=registry,ref=${IMAGE_NAME}:buildcache" \
+              --cache-to   "type=registry,ref=${IMAGE_NAME}:buildcache,mode=max" \
+              --tag "${IMAGE_NAME}:latest" \
+              --tag "${IMAGE_NAME}:${CIRCLE_SHA1}" \
+              .
+      - notify-slack
+
+  deploy:
+    executor: shell
+    steps:
+      - run:
+          name: Trigger Dokploy compose deploy
+          command: |
+            set -euo pipefail
+            curl -fsS -X POST "${DOKPLOY_URL%/}/api/compose.deploy" \
+              -H "x-api-key: $DOKPLOY_API_KEY" \
+              -H "Content-Type: application/json" \
+              -d "{\"composeId\":\"$DOKPLOY_COMPOSE_ID\"}"
+      - notify-slack
+
+workflows:
+  cicd-prod:
+    jobs:
+      - build-backend:
+          name: build-backend-cpu
+          image: supoclip-backend
+          cpu_only: "true"
+          context:
+            - reynandaptr-github
+            - slack
+          filters:
+            branches:
+              only: main
+      - build-backend:
+          name: build-backend-cuda
+          image: supoclip-backend-cuda
+          cpu_only: "false"
+          context:
+            - reynandaptr-github
+            - slack
+          filters:
+            branches:
+              only: main
+      - build-frontend:
+          name: build-frontend
+          context:
+            - reynandaptr-github
+            - slack
+          filters:
+            branches:
+              only: main
+      # The VPS needs only the CPU backend and the frontend; the WSL worker's timer picks up the
+      # CUDA image on its own.
+      - deploy:
+          name: deploy-prod
+          context:
+            - dokploy
+            - supoclip-production
+            - slack
+          requires:
+            - build-backend-cpu
+            - build-frontend
+          filters:
+            branches:
+              only: main
