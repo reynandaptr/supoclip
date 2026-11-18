@@ -1,0 +1,12 @@
+[Unit]
+Description=Pull and restart SupoClip's WSL video worker when a new image is published
+Documentation=file://%h/Development/sourcecodes/personal/supoclip/deploy/wsl-worker/README.md
+
+[Service]
+Type=oneshot
+# Adjust SUPOCLIP_DIR if the checkout lives elsewhere.
+Environment=SUPOCLIP_DIR=%h/Development/sourcecodes/personal/supoclip
+Environment=COMPOSE_ENV=%h/.config/supoclip/worker-compose.env
+ExecStart=/usr/bin/docker compose --env-file ${COMPOSE_ENV} -f ${SUPOCLIP_DIR}/deploy/wsl-worker/compose.yml pull worker
+# up -d only recreates the container when the pulled image changed.
+ExecStart=/usr/bin/docker compose --env-file ${COMPOSE_ENV} -f ${SUPOCLIP_DIR}/deploy/wsl-worker/compose.yml up -d worker
