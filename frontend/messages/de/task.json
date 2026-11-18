@@ -58,6 +58,8 @@
   "failedBody": "Die Verarbeitung ist fehlgeschlagen. Versuch die Generierung erneut. Deine fertigen Clips bleiben erhalten.",
   "failedBodyAgeRestricted": "Dieses YouTube-Video ist altersbeschränkt, daher können wir es nicht herunterladen. Lade das Video selbst herunter und lade die Datei hoch. Es wurden keine Minuten verbraucht.",
   "failedBodyGeoRestricted": "Dieses YouTube-Video ist in unserer Region nicht verfügbar, daher können wir es nicht herunterladen. Lade das Video selbst herunter und lade die Datei hoch. Es wurden keine Minuten verbraucht.",
+  "failedBodyTooLarge": "Dieses Video ist zu groß, um es in einer Generierung herunterzuladen. Versuch ein kürzeres Video oder lade eine kleinere Datei hoch. Es wurden keine Minuten verbraucht.",
+  "failedReason": "Grund:",
   "backHome": "Zurück zur Startseite",
   "noClipsTitle": "Keine Clips erzeugt",
   "noClipsBody": "Die Generierung ist fertig, aber es wurden keine Clips erzeugt. Das Video hatte vielleicht keinen passenden Inhalt zum Schneiden.",

@@ -58,6 +58,8 @@
   "failedBody": "El procesamiento ha fallado. Reintenta la generación. Los clips terminados se conservarán.",
   "failedBodyAgeRestricted": "Este video de YouTube tiene restricción de edad, así que no podemos descargarlo. Descarga el video tú mismo y sube el archivo. No se usaron minutos.",
   "failedBodyGeoRestricted": "Este video de YouTube no está disponible en nuestra región, así que no podemos descargarlo. Descarga el video tú mismo y sube el archivo. No se usaron minutos.",
+  "failedBodyTooLarge": "Este video es demasiado grande para descargarlo en una sola generación. Prueba con un video más corto o sube un archivo más pequeño. No se usaron minutos.",
+  "failedReason": "Motivo:",
   "backHome": "Volver al inicio",
   "noClipsTitle": "No se generaron clips",
   "noClipsBody": "La generación terminó, pero no se crearon clips. Es posible que el video no tuviera contenido adecuado para recortar.",

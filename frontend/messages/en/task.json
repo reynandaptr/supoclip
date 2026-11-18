@@ -58,6 +58,8 @@
   "failedBody": "Processing failed. Retry generation to try again. Your completed clips will be kept.",
   "failedBodyAgeRestricted": "This YouTube video is age-restricted, so we can't download it. Download the video yourself and upload the file instead. No minutes were used.",
   "failedBodyGeoRestricted": "This YouTube video isn't available in our region, so we can't download it. Download the video yourself and upload the file instead. No minutes were used.",
+  "failedBodyTooLarge": "This video is too large to download in one generation. Try a shorter video, or upload a smaller file. No minutes were used.",
+  "failedReason": "Reason:",
   "backHome": "Back to Home",
   "noClipsTitle": "No Clips Generated",
   "noClipsBody": "The generation completed but no clips were generated. The video may not have had suitable content for clipping.",

@@ -58,6 +58,8 @@
   "failedBody": "Pemrosesan gagal. Coba pembuatan lagi. Klip yang sudah selesai akan tetap disimpan.",
   "failedBodyAgeRestricted": "Video YouTube ini dibatasi usia, jadi kami tidak bisa mengunduhnya. Unduh videonya sendiri lalu unggah filenya. Tidak ada menit yang terpakai.",
   "failedBodyGeoRestricted": "Video YouTube ini tidak tersedia di wilayah kami, jadi kami tidak bisa mengunduhnya. Unduh videonya sendiri lalu unggah filenya. Tidak ada menit yang terpakai.",
+  "failedBodyTooLarge": "Video ini terlalu besar untuk diunduh dalam satu pembuatan. Coba video yang lebih pendek, atau unggah file yang lebih kecil. Tidak ada menit yang terpakai.",
+  "failedReason": "Penyebab:",
   "backHome": "Kembali ke beranda",
   "noClipsTitle": "Tidak ada clip yang dihasilkan",
   "noClipsBody": "Generasi selesai, tapi tidak ada clip yang dihasilkan. Videonya mungkin tidak punya konten yang cocok untuk di-clip.",

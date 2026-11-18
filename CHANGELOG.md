@@ -4,6 +4,10 @@ What changed in SupoClip for people using the product. Newest dates are first.
 
 Add a line here when a pull request changes something a user can see. Use **New**, **Improved**, **Fixed**, or **Under the hood**, describe the change in plain language, and link the pull request. Skip internal-only work, or fold it into one **Under the hood** line. Do not include customer names, email addresses, user IDs, or anything else private.
 
+## 2026-11-19
+
+- **Improved:** A failed generation now says why it failed under the usual message, for example that the video stalled or couldn't be downloaded. A video too large to download gets its own explanation with how big the download got and the limit it passed. (PR_LINK)
+
 ## 2026-11-18
 
 - **New:** The task list can send completed tasks to your webhook again, for tasks that finished before the webhook was set up or whose delivery failed. ([webhook guide](https://github.com/reynandaptr/supoclip/blob/main/docs/webhooks.md#sending-a-task-again))

@@ -46,7 +46,7 @@ from .task_completion_email_service import (
 )
 from ..config import Config, get_config
 from ..youtube_utils import cleanup_downloaded_files, extract_video_id
-from ..youtube_proxy import YouTubeGeoRestrictedError, is_age_restricted_error
+from ..youtube_proxy import DownloadBudgetExceeded, YouTubeGeoRestrictedError, is_age_restricted_error
 from ..youtube_source import load_time_map, localize_segment, restore_clip_timeline, transcript_source_for
 from ..clip_cleanup import normalize_clip_cleanup_settings
 from ..clip_duration import clip_duration, validate_clip_length
@@ -145,11 +145,32 @@ KEPT_OUTPUTS_ERROR = "Your finished clips are saved. Retry generation to create 
 _GENERIC_ERROR = "Something went wrong while generating your clips. Retry generation to try again."
 
 
+def _gigabytes(nbytes: int) -> str:
+    return f"{nbytes / 1_000_000_000:.1f} GB"
+
+
 def user_facing_error(error: Exception) -> str:
     """What the task page shows for ``error``. The real one stays in the logs."""
+    if isinstance(error, DownloadBudgetExceeded) and error.limit:
+        return (
+            f"The download reached {_gigabytes(error.total)}, "
+            f"over the {_gigabytes(error.limit)} limit for one generation "
+            "(YOUTUBE_DOWNLOAD_MAX_BYTES)."
+        )
     if type(error) is RuntimeError or isinstance(error, _INTERNAL_ERRORS):
         return _GENERIC_ERROR
     return str(error) or _GENERIC_ERROR
+
+
+def failure_reason(task: Dict[str, Any]) -> Optional[str]:
+    """The specific reason a failed task shows, or None when there is nothing
+    more to say than the page's generic failure text."""
+    if task.get("status") != "error":
+        return None
+    message = (task.get("progress_message") or "").strip()
+    if not message or message == _GENERIC_ERROR:
+        return None
+    return message
 
 
 class TaskService(ClipEditingMixin):
@@ -1069,6 +1090,8 @@ class TaskService(ClipEditingMixin):
                 error_code = "youtube_geo_restricted"
             elif is_age_restricted_error(e):
                 error_code = "youtube_age_restricted"
+            elif isinstance(e, DownloadBudgetExceeded):
+                error_code = "download_too_large"
             elif "download" in message or "youtube" in message:
                 error_code = "download_error"
             elif "analysis" in message:
@@ -1280,6 +1303,7 @@ class TaskService(ClipEditingMixin):
         ]
         task["clips_count"] = len(clips)
         task.update(await self._load_task_source_settings(task_id))
+        task["failure_reason"] = failure_reason(task)
 
         return task
 
