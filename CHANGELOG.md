@@ -6,7 +6,7 @@ Add a line here when a pull request changes something a user can see. Use **New*
 
 ## 2026-11-19
 
-- **Improved:** A failed generation now says why it failed under the usual message, for example that the video stalled or couldn't be downloaded. A video too large to download gets its own explanation with how big the download got and the limit it passed. (PR_LINK)
+- **Improved:** A failed generation now says why it failed under the usual message, for example that the video stalled or couldn't be downloaded. A video too large to download gets its own explanation with how big the download got and the limit it passed. ([#2](https://github.com/reynandaptr/supoclip/pull/2))
 
 ## 2026-11-18
 
