@@ -86,6 +86,14 @@ from ...clip_editor import export_with_preset, EXPORT_PRESETS
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
+MANUAL_CLIP_EDITS_DISABLED = "Manual clip edits are disabled on this server."
+
+
+def require_manual_clip_edits() -> None:
+    """403 for the clip edits that encode inside the API when MANUAL_CLIP_EDITS_ENABLED is off."""
+    if not get_config().manual_clip_edits_enabled:
+        raise HTTPException(status_code=403, detail=MANUAL_CLIP_EDITS_DISABLED)
+
 
 class _DurationUnavailable(Exception):
     """Metadata came back, but with no positive length."""
@@ -1363,7 +1371,7 @@ async def download_clip_archive(
     )
 
 
-@router.patch("/{task_id}/clips/{clip_id}")
+@router.patch("/{task_id}/clips/{clip_id}", dependencies=[Depends(require_manual_clip_edits)])
 async def trim_clip(
     task_id: str, clip_id: str, request: Request, db: AsyncSession = Depends(get_db)
 ):
@@ -1391,7 +1399,7 @@ async def trim_clip(
         raise HTTPException(status_code=500, detail=f"Error trimming clip: {str(e)}")
 
 
-@router.post("/{task_id}/clips/{clip_id}/split")
+@router.post("/{task_id}/clips/{clip_id}/split", dependencies=[Depends(require_manual_clip_edits)])
 async def split_clip(
     task_id: str, clip_id: str, request: Request, db: AsyncSession = Depends(get_db)
 ):
@@ -1417,7 +1425,7 @@ async def split_clip(
         raise HTTPException(status_code=500, detail=f"Error splitting clip: {str(e)}")
 
 
-@router.post("/{task_id}/clips/merge")
+@router.post("/{task_id}/clips/merge", dependencies=[Depends(require_manual_clip_edits)])
 async def merge_clips(
     task_id: str, request: Request, db: AsyncSession = Depends(get_db)
 ):
@@ -1441,7 +1449,7 @@ async def merge_clips(
         raise HTTPException(status_code=500, detail=f"Error merging clips: {str(e)}")
 
 
-@router.patch("/{task_id}/clips/{clip_id}/captions")
+@router.patch("/{task_id}/clips/{clip_id}/captions", dependencies=[Depends(require_manual_clip_edits)])
 async def update_clip_captions(
     task_id: str, clip_id: str, request: Request, db: AsyncSession = Depends(get_db)
 ):
@@ -1498,7 +1506,7 @@ async def update_clip_captions(
         )
 
 
-@router.post("/{task_id}/clips/{clip_id}/regenerate")
+@router.post("/{task_id}/clips/{clip_id}/regenerate", dependencies=[Depends(require_manual_clip_edits)])
 async def regenerate_clip(
     task_id: str, clip_id: str, request: Request, db: AsyncSession = Depends(get_db)
 ):
@@ -1537,6 +1545,9 @@ async def apply_task_settings(
         font_color = _normalize_font_color(payload.get("font_color"))
         caption_template = payload.get("caption_template", "default")
         apply_to_existing = bool(payload.get("apply_to_existing", False))
+        if apply_to_existing:
+            # Re-renders every clip of the task inside the API process.
+            require_manual_clip_edits()
 
         task_service = TaskService(db)
         await _require_task_owner(request, task_service, db, task_id)
@@ -1607,7 +1618,7 @@ async def apply_task_settings(
         )
 
 
-@router.get("/{task_id}/clips/{clip_id}/export")
+@router.get("/{task_id}/clips/{clip_id}/export", dependencies=[Depends(require_manual_clip_edits)])
 @media_work
 async def export_clip(
     task_id: str,

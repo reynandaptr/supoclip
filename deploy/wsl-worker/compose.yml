@@ -1,0 +1,59 @@
+# SupoClip's video worker on the owner's WSL PC (NVIDIA GPU). Read README.md here first.
+#
+# The only video worker of the Dokploy deployment (deploy/dokploy/compose.yml): it downloads
+# sources, transcribes with Whisper on the GPU and renders clips. It shares PostgreSQL, Redis and
+# the R2 bucket with the VPS and nothing else (docs/render-worker.md). PostgreSQL and Redis are
+# reached over Tailscale at the VPS's tailnet address.
+#
+# Based on deploy/render-worker/compose.yml, with: the CUDA image, GPU access, a Whisper model
+# cache, and a normal bridge network (Docker Desktop's host network is its own VM, not WSL).
+name: supoclip-wsl-worker
+services:
+  worker:
+    image: ${WORKER_IMAGE:-ghcr.io/reynandaptr/supoclip-backend-cuda:latest}
+    pull_policy: always
+    platform: linux/amd64
+    # The video worker only; the scheduler runs on the VPS.
+    command: [".venv/bin/python", "-m", "src.workers.run_workers"]
+    gpus: all
+    env_file:
+      - path: ${WORKER_ENV_FILE:-${HOME}/.config/supoclip/worker.env}
+        format: raw
+    environment:
+      PYTHONPATH: /app
+      PYTHONUNBUFFERED: "1"
+      SUPOCLIP_SERVICE: worker
+      TEMP_DIR: /app/uploads
+      MEDIA_STORAGE: s3
+      DATABASE_URL: ${WORKER_DATABASE_URL:?Set WORKER_DATABASE_URL (postgresql+asyncpg://supoclip:...@100.98.156.81:15432/supoclip)}
+      REDIS_HOST: ${WORKER_REDIS_HOST:-100.98.156.81}
+      REDIS_PORT: ${WORKER_REDIS_PORT:-16379}
+      EMBED_CRON_WORKER: "0"
+      TRANSCRIPTION_PROVIDER: whisper
+      WHISPER_MODEL_SIZE: ${WHISPER_MODEL_SIZE:-turbo}
+    volumes:
+      # Downloads, caches and renders in progress. Safe to lose.
+      - type: bind
+        source: ${WORKER_SCRATCH_PATH:-${HOME}/.local/share/supoclip-worker/scratch}
+        target: /app/uploads
+        bind:
+          create_host_path: true
+      # Whisper weights survive container recreation (turbo is ~1.6 GB).
+      - whisper_models:/root/.cache/whisper
+    restart: unless-stopped
+    # A render that is cut off is retried by the queue; give running ones time to finish.
+    stop_grace_period: 3h
+    healthcheck:
+      test: ["CMD", ".venv/bin/arq", "--check", "src.workers.tasks.WorkerSettings"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+volumes:
+  whisper_models:

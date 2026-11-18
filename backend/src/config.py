@@ -295,6 +295,12 @@ class Config:
         self.social_publish_max_attempts = int(
             os.getenv("SOCIAL_PUBLISH_MAX_ATTEMPTS", "3")
         )
+        # Trim, split, merge, caption edit, regenerate and the synchronous preset
+        # export re-encode video inside the API process. Hosts that keep all
+        # video work on remote workers set MANUAL_CLIP_EDITS_ENABLED=false.
+        self.manual_clip_edits_enabled = os.getenv(
+            "MANUAL_CLIP_EDITS_ENABLED", "true"
+        ).strip().lower() not in {"0", "false", "no", "off"}
         # Who may use social publishing: "off" (default; nav and pages stay
         # hidden), "admins" (admins plus the allowlist, for a gated rollout)
         # or "all".
