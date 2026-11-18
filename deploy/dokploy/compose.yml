@@ -1,0 +1,314 @@
+# SupoClip application host on Dokploy (reynandaptr.dev). Read deploy/dokploy/README.md first.
+#
+# Runs the web app, API, AI worker, scheduler, PostgreSQL and Redis. There is no video worker
+# here: rendering, transcription and downloads run on a separate machine
+# (deploy/wsl-worker/compose.yml, docs/render-worker.md), so media lives in the S3 bucket
+# (Cloudflare R2) and the inline-encoding clip edits are switched off.
+#
+# PostgreSQL and Redis publish on 127.0.0.1 only (15432/16379); the host exposes them to the
+# tailnet with `tailscale serve --tcp`. Never publish them on 0.0.0.0.
+#
+# Images are built by CircleCI (.circleci/config.yml). pull_policy: always makes every Dokploy
+# deploy run the newest `latest`.
+
+x-backend-env: &backend-env
+  PYTHONPATH: "/app"
+  PYTHONUNBUFFERED: "1"
+  PUBLIC_API_URL: "http://backend:8000"
+  WEBHOOK_ALLOW_PRIVATE_TARGETS: "true"
+  POSTHOG_PROJECT_TOKEN: "${POSTHOG_PROJECT_TOKEN:-}"
+  POSTHOG_HOST: "${POSTHOG_HOST:-https://eu.i.posthog.com}"
+  DATABASE_URL: "postgresql+asyncpg://supoclip:${POSTGRES_PASSWORD:?required}@postgres:5432/supoclip"
+  TEMP_DIR: "/app/uploads"
+  MEDIA_STORAGE: "s3"
+  MEDIA_S3_BUCKET: "${MEDIA_S3_BUCKET:?required}"
+  MEDIA_S3_PREFIX: "${MEDIA_S3_PREFIX:-media}"
+  MEDIA_S3_REGION: "${MEDIA_S3_REGION:-auto}"
+  MEDIA_S3_ENDPOINT: "${MEDIA_S3_ENDPOINT:?required}"
+  MEDIA_S3_ACCESS_KEY_ID: "${MEDIA_S3_ACCESS_KEY_ID:-}"
+  MEDIA_S3_SECRET_ACCESS_KEY: "${MEDIA_S3_SECRET_ACCESS_KEY:-}"
+  MEDIA_S3_SESSION_TOKEN: "${MEDIA_S3_SESSION_TOKEN:-}"
+  MEDIA_FALLBACK_BUCKET: "${MEDIA_FALLBACK_BUCKET:-}"
+  MEDIA_FALLBACK_ENDPOINT: "${MEDIA_FALLBACK_ENDPOINT:-}"
+  MEDIA_FALLBACK_REGION: "${MEDIA_FALLBACK_REGION:-auto}"
+  MEDIA_FALLBACK_ACCESS_KEY_ID: "${MEDIA_FALLBACK_ACCESS_KEY_ID:-}"
+  MEDIA_FALLBACK_SECRET_ACCESS_KEY: "${MEDIA_FALLBACK_SECRET_ACCESS_KEY:-}"
+  MEDIA_FAILOVER_ENABLED: "${MEDIA_FAILOVER_ENABLED:-false}"
+  MEDIA_PREFERRED_STORE: "${MEDIA_PREFERRED_STORE:-primary}"
+  MEDIA_URL_TTL_SECONDS: "${MEDIA_URL_TTL_SECONDS:-900}"
+  MEDIA_CACHE_TTL_SECONDS: "${MEDIA_CACHE_TTL_SECONDS:-86400}"
+  MEDIA_ORPHAN_GRACE_SECONDS: "${MEDIA_ORPHAN_GRACE_SECONDS:-86400}"
+  MEDIA_UPLOAD_CONCURRENCY: "${MEDIA_UPLOAD_CONCURRENCY:-3}"
+  MEDIA_UPLOAD_DAILY_LIMIT: "${MEDIA_UPLOAD_DAILY_LIMIT:-20}"
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+  REDIS_PASSWORD: "${REDIS_PASSWORD:?required}"
+  ASSEMBLY_AI_API_KEY: "${ASSEMBLY_AI_API_KEY:-}"
+  ASSEMBLY_AI_HTTP_TIMEOUT_SECONDS: "${ASSEMBLY_AI_HTTP_TIMEOUT_SECONDS:-900}"
+  ASSEMBLY_AI_REQUEST_TIMEOUT_SECONDS: "${ASSEMBLY_AI_REQUEST_TIMEOUT_SECONDS:-60}"
+  APIFY_API_TOKEN: "${APIFY_API_TOKEN:-}"
+  RAPIDAPI_YOUTUBE_API_KEY: "${RAPIDAPI_YOUTUBE_API_KEY:-}"
+  RAPIDAPI_YOUTUBE_TIMEOUT_SECONDS: "${RAPIDAPI_YOUTUBE_TIMEOUT_SECONDS:-300}"
+  RAPIDAPI_YOUTUBE_HOST: "${RAPIDAPI_YOUTUBE_HOST:-}"
+  RAPIDAPI_YOUTUBE_RELAY_HOST: "${RAPIDAPI_YOUTUBE_RELAY_HOST:-}"
+  APIFY_YOUTUBE_DOWNLOADER_ACTOR: "${APIFY_YOUTUBE_DOWNLOADER_ACTOR:-}"
+  APIFY_YOUTUBE_PROVIDERS: "${APIFY_YOUTUBE_PROVIDERS:-}"
+  APIFY_STORAGE_BUCKET: "${APIFY_STORAGE_BUCKET:-}"
+  APIFY_STORAGE_REGION: "${APIFY_STORAGE_REGION:-}"
+  APIFY_STORAGE_WRITER_ACCESS_KEY_ID: "${APIFY_STORAGE_WRITER_ACCESS_KEY_ID:-}"
+  APIFY_STORAGE_WRITER_SECRET_ACCESS_KEY: "${APIFY_STORAGE_WRITER_SECRET_ACCESS_KEY:-}"
+  APIFY_STORAGE_READER_ACCESS_KEY_ID: "${APIFY_STORAGE_READER_ACCESS_KEY_ID:-}"
+  APIFY_STORAGE_READER_SECRET_ACCESS_KEY: "${APIFY_STORAGE_READER_SECRET_ACCESS_KEY:-}"
+  APIFY_STORAGE_KEY_TEMPLATE: "${APIFY_STORAGE_KEY_TEMPLATE:-}"
+  APIFY_YOUTUBE_FALLBACK_ACTOR: "${APIFY_YOUTUBE_FALLBACK_ACTOR:-}"
+  APIFY_YOUTUBE_FALLBACK_ACTORS: "${APIFY_YOUTUBE_FALLBACK_ACTORS:-}"
+  APIFY_DOWNLOAD_MAX_CHARGE_USD: "${APIFY_DOWNLOAD_MAX_CHARGE_USD:-6}"
+  APIFY_FALLBACK_MAX_CHARGE_USD: "${APIFY_FALLBACK_MAX_CHARGE_USD:-6}"
+  APIFY_YOUTUBE_INPUT_ADAPTER: "${APIFY_YOUTUBE_INPUT_ADAPTER:-start_urls}"
+  APIFY_YOUTUBE_DEFAULT_QUALITY: "${APIFY_YOUTUBE_DEFAULT_QUALITY:-1080}"
+  APIFY_RUN_TIMEOUT_SECONDS: "${APIFY_RUN_TIMEOUT_SECONDS:-3600}"
+  YOUTUBE_DATA_API_KEY: "${YOUTUBE_DATA_API_KEY:-}"
+  YOUTUBE_METADATA_PROVIDER: "${YOUTUBE_METADATA_PROVIDER:-yt_dlp}"
+  YOUTUBE_PREFLIGHT_TIMEOUT_SECONDS: "${YOUTUBE_PREFLIGHT_TIMEOUT_SECONDS:-30}"
+  YOUTUBE_DOWNLOAD_PROVIDER: "${YOUTUBE_DOWNLOAD_PROVIDER:-yt_dlp}"
+  YOUTUBE_PROXY_URL: "${YOUTUBE_PROXY_URL:-}"
+  YOUTUBE_PROXY_TIMEOUT_SECONDS: "${YOUTUBE_PROXY_TIMEOUT_SECONDS:-300}"
+  STREAM_DOWNLOAD_MAX_SECONDS: "${STREAM_DOWNLOAD_MAX_SECONDS:-2400}"
+  YOUTUBE_PROXY_COUNTRY: "${YOUTUBE_PROXY_COUNTRY:-}"
+  YOUTUBE_POT_PROVIDER_URL: "${YOUTUBE_POT_PROVIDER_URL:-}"
+  YOUTUBE_DOWNLOAD_MAX_BYTES: "${YOUTUBE_DOWNLOAD_MAX_BYTES:-2000000000}"
+  YOUTUBE_SECTION_PADDING_SECONDS: "${YOUTUBE_SECTION_PADDING_SECONDS:-10}"
+  YOUTUBE_MAX_HEIGHT: "${YOUTUBE_MAX_HEIGHT:-1080}"
+  YOUTUBE_SOURCE_CACHE: "${YOUTUBE_SOURCE_CACHE:-on}"
+  YOUTUBE_SOURCE_CACHE_TTL_SECONDS: "${YOUTUBE_SOURCE_CACHE_TTL_SECONDS:-604800}"
+  APIFY_EXPENSIVE_FALLBACKS: "${APIFY_EXPENSIVE_FALLBACKS:-false}"
+  LLM: "${LLM:-}"
+  OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+  OPENROUTER_API_KEY: "${OPENROUTER_API_KEY:-}"
+  OPENROUTER_FALLBACK_MODEL: "${OPENROUTER_FALLBACK_MODEL:-openai/gpt-6-luna}"
+  RERANK_LLM: "${RERANK_LLM:-}"
+  GOOGLE_API_KEY: "${GOOGLE_API_KEY:-}"
+  ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+  AI_EDIT_MODEL: "${AI_EDIT_MODEL:-claude-sonnet-5-5}"
+  CANCELLATION_REVIEWS_ENABLED: "${CANCELLATION_REVIEWS_ENABLED:-false}"
+  CANCELLATION_REVIEW_SETTLE_SECONDS: "${CANCELLATION_REVIEW_SETTLE_SECONDS:-600}"
+  CANCELLATION_REVIEW_MODEL: "${CANCELLATION_REVIEW_MODEL:-claude-sonnet-5-5}"
+  CANCELLATION_REPORT_WEBHOOK_URL: "${CANCELLATION_REPORT_WEBHOOK_URL:-}"
+  CANCELLATION_REPORT_WEBHOOK_SECRET: "${CANCELLATION_REPORT_WEBHOOK_SECRET:-}"
+  STRIPE_SOURCE_ACCOUNT_ID: "${STRIPE_SOURCE_ACCOUNT_ID:-}"
+  OLLAMA_BASE_URL: "${OLLAMA_BASE_URL:-}"
+  OLLAMA_API_KEY: "${OLLAMA_API_KEY:-}"
+  TRANSCRIPTION_PROVIDER: "${TRANSCRIPTION_PROVIDER:-whisper}"
+  TRANSCRIPTION_LANGUAGE: "${TRANSCRIPTION_LANGUAGE:-}"
+  WHISPER_MODEL_SIZE: "${WHISPER_MODEL_SIZE:-turbo}"
+  MAX_VIDEO_DURATION: "${MAX_VIDEO_DURATION:-5400}"
+  PRO_YOUTUBE_MAX_VIDEO_DURATION: "${PRO_YOUTUBE_MAX_VIDEO_DURATION:-5400}"
+  SCALE_YOUTUBE_MAX_VIDEO_DURATION: "${SCALE_YOUTUBE_MAX_VIDEO_DURATION:-10800}"
+  MAX_VIDEO_UPLOAD_BYTES: "${MAX_VIDEO_UPLOAD_BYTES:-4000000000}"
+  QUEUED_TASK_TIMEOUT_SECONDS: "${QUEUED_TASK_TIMEOUT_SECONDS:-180}"
+  DEFAULT_PROCESSING_MODE: "${DEFAULT_PROCESSING_MODE:-fast}"
+  MAX_CLIPS: "${MAX_CLIPS:-10}"
+  FAST_MODE_MAX_CLIPS: "${FAST_MODE_MAX_CLIPS:-10}"
+  SPEAKER_FRAMING: "${SPEAKER_FRAMING:-true}"
+  HOOK_FIRST_TEASER: "${HOOK_FIRST_TEASER:-false}"
+  ASSEMBLY_AI_SPEECH_MODEL: "${ASSEMBLY_AI_SPEECH_MODEL:-}"
+  FAST_MODE_TRANSCRIPT_MODEL: "${FAST_MODE_TRANSCRIPT_MODEL:-universal-3-5-pro}"
+  SELF_HOST: "true"
+  BACKEND_AUTH_SECRET: "${BACKEND_AUTH_SECRET:?required}"
+  APP_SETTINGS_ENCRYPTION_KEY: "${APP_SETTINGS_ENCRYPTION_KEY:?required}"
+  AUTH_SIGNATURE_TTL_SECONDS: "${AUTH_SIGNATURE_TTL_SECONDS:-300}"
+  CORS_ORIGINS: "${CORS_ORIGINS:-https://supoclip.reynandaptr.dev}"
+  PRO_PLAN_MINUTE_LIMIT: "${PRO_PLAN_MINUTE_LIMIT:-600}"
+  SCALE_PLAN_MINUTE_LIMIT: "${SCALE_PLAN_MINUTE_LIMIT:-1500}"
+  AWS_REGION: "${AWS_REGION:-}"
+  AWS_ACCESS_KEY_ID: "${AWS_ACCESS_KEY_ID:-}"
+  AWS_SECRET_ACCESS_KEY: "${AWS_SECRET_ACCESS_KEY:-}"
+  SES_FROM_EMAIL: "${SES_FROM_EMAIL:-SupoClip <onboarding@example.com>}"
+  NEXT_PUBLIC_APP_URL: "${NEXT_PUBLIC_APP_URL:-https://supoclip.reynandaptr.dev}"
+  YOUTUBE_OAUTH_CLIENT_ID: "${YOUTUBE_OAUTH_CLIENT_ID:-}"
+  YOUTUBE_OAUTH_CLIENT_SECRET: "${YOUTUBE_OAUTH_CLIENT_SECRET:-}"
+  TIKTOK_CLIENT_KEY: "${TIKTOK_CLIENT_KEY:-}"
+  TIKTOK_CLIENT_SECRET: "${TIKTOK_CLIENT_SECRET:-}"
+  TIKTOK_APP_AUDITED: "${TIKTOK_APP_AUDITED:-false}"
+  INSTAGRAM_APP_ID: "${INSTAGRAM_APP_ID:-}"
+  INSTAGRAM_APP_SECRET: "${INSTAGRAM_APP_SECRET:-}"
+  SOCIAL_OAUTH_REDIRECT_BASE_URL: "${SOCIAL_OAUTH_REDIRECT_BASE_URL:-}"
+  SOCIAL_PUBLIC_MEDIA_BASE_URL: "${SOCIAL_PUBLIC_MEDIA_BASE_URL:-}"
+  SOCIAL_METRICS_REFRESH_HOURS: "${SOCIAL_METRICS_REFRESH_HOURS:-6}"
+  SOCIAL_METRICS_MAX_POST_AGE_DAYS: "${SOCIAL_METRICS_MAX_POST_AGE_DAYS:-60}"
+  SOCIAL_PERFORMANCE_MIN_POSTS: "${SOCIAL_PERFORMANCE_MIN_POSTS:-3}"
+  SOCIAL_PUBLISHING_ACCESS: "${SOCIAL_PUBLISHING_ACCESS:-off}"
+  SOCIAL_PUBLISHING_PROVIDERS: "${SOCIAL_PUBLISHING_PROVIDERS-youtube,tiktok,instagram}"
+  SOCIAL_PUBLISHING_ALLOWED_EMAILS: "${SOCIAL_PUBLISHING_ALLOWED_EMAILS:-}"
+  WORKFLOWS_ACCESS: "${WORKFLOWS_ACCESS:-all}"
+  WORKFLOWS_ALLOWED_EMAILS: "${WORKFLOWS_ALLOWED_EMAILS:-}"
+  WORKFLOWS_PUBLIC: "${WORKFLOWS_PUBLIC:-}"
+  WORKFLOW_TOPIC_MAX_CLIPS: "${WORKFLOW_TOPIC_MAX_CLIPS:-15}"
+  WORKFLOW_PLAN_TIMEOUT_SECONDS: "${WORKFLOW_PLAN_TIMEOUT_SECONDS:-1800}"
+  WORKFLOW_FULL_CONTEXT_MAX_WORDS: "${WORKFLOW_FULL_CONTEXT_MAX_WORDS:-}"
+  VIDEO_JOB_USER_CONCURRENCY: "${VIDEO_JOB_USER_CONCURRENCY:-1}"
+  VIDEO_JOB_DEFER_SECONDS: "${VIDEO_JOB_DEFER_SECONDS:-20}"
+  UPLOAD_COPY_WAIT_SECONDS: "${UPLOAD_COPY_WAIT_SECONDS:-1800}"
+  QUEUE_DELAY_ALERT_SECONDS: "${QUEUE_DELAY_ALERT_SECONDS:-600}"
+  QUEUE_DELAY_ALERT_INTERVAL_SECONDS: "${QUEUE_DELAY_ALERT_INTERVAL_SECONDS:-900}"
+  EMBED_CRON_WORKER: "0"
+  MANUAL_CLIP_EDITS_ENABLED: "${MANUAL_CLIP_EDITS_ENABLED:-false}"
+  MCP_OAUTH_SECRET: "${MCP_OAUTH_SECRET:-}"
+  DISCORD_FEEDBACK_WEBHOOK_URL: "${DISCORD_FEEDBACK_WEBHOOK_URL:-}"
+  DISCORD_SALES_WEBHOOK_URL: "${DISCORD_SALES_WEBHOOK_URL:-}"
+  STRIPE_CANCELLATION_WEBHOOK_SECRETS: "${STRIPE_CANCELLATION_WEBHOOK_SECRETS:-}"
+
+x-backend: &backend
+  image: ghcr.io/reynandaptr/supoclip-backend:${SUPOCLIP_TAG:-latest}
+  pull_policy: always
+  restart: unless-stopped
+  networks:
+    - supoclip-network
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+  backend:
+    <<: *backend
+    command: [".venv/bin/uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      <<: *backend-env
+      SUPOCLIP_SERVICE: "api"
+    volumes:
+      # Direct /upload bodies land here before the copy to the bucket; user fonts are kept here too.
+      - uploads:/app/uploads
+      - user_fonts:/app/fonts/users
+    networks:
+      - supoclip-network
+      - dokploy-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/db"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  ai-worker:
+    <<: *backend
+    command: [".venv/bin/arq", "src.workers.ai_worker.AIWorkerSettings"]
+    environment:
+      <<: *backend-env
+      SUPOCLIP_SERVICE: "ai-worker"
+    healthcheck:
+      test: ["CMD", ".venv/bin/arq", "--check", "src.workers.ai_worker.AIWorkerSettings"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # The scheduler (supoclip_cron). It must run on this host: it copies uploads that landed on
+  # the API's disk to the bucket (docs/render-worker.md).
+  cron-worker:
+    <<: *backend
+    command: [".venv/bin/arq", "src.workers.cron_worker.CronWorkerSettings"]
+    environment:
+      <<: *backend-env
+      SUPOCLIP_SERVICE: "cron-worker"
+    volumes:
+      - uploads:/app/uploads
+      - user_fonts:/app/fonts/users
+    healthcheck:
+      test: ["CMD", ".venv/bin/arq", "--check", "src.workers.cron_worker.CronWorkerSettings"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  frontend:
+    image: ghcr.io/reynandaptr/supoclip-frontend:${SUPOCLIP_TAG:-latest}
+    pull_policy: always
+    restart: unless-stopped
+    environment:
+      NODE_ENV: "production"
+      NEXT_TELEMETRY_DISABLED: "1"
+      BACKEND_INTERNAL_URL: "http://backend:8000"
+      DATABASE_URL: "postgresql://supoclip:${POSTGRES_PASSWORD:?required}@postgres:5432/supoclip"
+      BETTER_AUTH_SECRET: "${BETTER_AUTH_SECRET:?required}"
+      BETTER_AUTH_URL: "${NEXT_PUBLIC_APP_URL:-https://supoclip.reynandaptr.dev}"
+      BETTER_AUTH_TRUSTED_ORIGINS: "${NEXT_PUBLIC_APP_URL:-https://supoclip.reynandaptr.dev}"
+      BACKEND_AUTH_SECRET: "${BACKEND_AUTH_SECRET:?required}"
+      APP_SETTINGS_ENCRYPTION_KEY: "${APP_SETTINGS_ENCRYPTION_KEY:?required}"
+      DISABLE_SIGN_UP: "${DISABLE_SIGN_UP:-true}"
+      NEXT_PUBLIC_LANDING_ONLY_MODE: "false"
+    networks:
+      - supoclip-network
+      - dokploy-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    healthcheck:
+      # Exercises Better Auth and Prisma, not only the static landing page.
+      test: ["CMD", "curl", "-f", "http://localhost:3107/api/auth/get-session"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: "supoclip"
+      POSTGRES_USER: "supoclip"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?required}"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../../init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      # Tailnet only, via `tailscale serve --tcp 15432 tcp://127.0.0.1:15432` (README).
+      - "127.0.0.1:15432:5432"
+    networks:
+      - supoclip-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U supoclip -d supoclip"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: "${REDIS_PASSWORD:?required}"
+    command:
+      [
+        "sh",
+        "-c",
+        "exec docker-entrypoint.sh redis-server --appendonly yes --requirepass \"$${REDIS_PASSWORD}\"",
+      ]
+    volumes:
+      - redis_data:/data
+    ports:
+      # Tailnet only, via `tailscale serve --tcp 16379 tcp://127.0.0.1:16379` (README).
+      - "127.0.0.1:16379:6379"
+    networks:
+      - supoclip-network
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" --no-auth-warning ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  uploads:
+  user_fonts:
+  postgres_data:
+  redis_data:
+
+networks:
+  # clipper-uploader joins this network as external (http://backend:8000, and SupoClip's webhook
+  # reaches http://clipper-uploader:8080).
+  supoclip-network:
+    name: supoclip-network
+  dokploy-network:
+    external: true
