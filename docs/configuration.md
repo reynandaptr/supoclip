@@ -115,7 +115,7 @@ See [Task-completed webhook](webhooks.md).
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `MANUAL_CLIP_EDITS_ENABLED` | `true` | `false` makes trim, split, merge, caption edit, regenerate and the synchronous preset export (`GET .../clips/{id}/export`) answer `403`. These re-encode video inside the API process; set `false` on hosts where all video work must run on remote workers ([render-worker.md](render-worker.md)). The clip studio's queued prepare/export/combine are unaffected. |
+| `MANUAL_CLIP_EDITS_ENABLED` | `true` | `false` makes trim, split, merge, caption edit, regenerate, the synchronous preset export (`GET .../clips/{id}/export`) and applying task settings to existing clips (`POST /tasks/{id}/settings` with `apply_to_existing: true`) answer `403`. These re-encode video inside the API process; set `false` on hosts where all video work must run on remote workers ([render-worker.md](render-worker.md)). The clip studio's queued prepare/export/combine are unaffected. |
 
 ## Analytics Settings
 

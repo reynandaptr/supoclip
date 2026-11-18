@@ -83,6 +83,26 @@ async def test_enabled_routes_are_not_blocked(http, monkeypatch, method, path, b
     assert detail != DISABLED_DETAIL
 
 
+async def test_settings_applied_to_existing_clips_answer_403(http, monkeypatch):
+    """Applying settings to existing clips re-renders every clip inside the API."""
+    monkeypatch.setenv("MANUAL_CLIP_EDITS_ENABLED", "false")
+    response = await http.post(
+        "/tasks/t/settings", json={"font_size": 40, "apply_to_existing": True}
+    )
+    assert response.status_code == 403
+    assert response.json()["detail"] == DISABLED_DETAIL
+    assert RecordingTaskService.calls == []
+
+
+async def test_settings_without_apply_to_existing_are_not_blocked(http, monkeypatch):
+    monkeypatch.setenv("MANUAL_CLIP_EDITS_ENABLED", "false")
+    response = await http.post(
+        "/tasks/t/settings", json={"font_size": 40, "apply_to_existing": False}
+    )
+    detail = response.json().get("detail") if response.headers.get("content-type", "").startswith("application/json") else None
+    assert detail != DISABLED_DETAIL
+
+
 async def test_other_routes_unaffected(http, monkeypatch):
     monkeypatch.setenv("MANUAL_CLIP_EDITS_ENABLED", "false")
     response = await http.patch("/tasks/t", json={"title": "new title"})

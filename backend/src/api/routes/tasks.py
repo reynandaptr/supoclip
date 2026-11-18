@@ -1545,6 +1545,9 @@ async def apply_task_settings(
         font_color = _normalize_font_color(payload.get("font_color"))
         caption_template = payload.get("caption_template", "default")
         apply_to_existing = bool(payload.get("apply_to_existing", False))
+        if apply_to_existing:
+            # Re-renders every clip of the task inside the API process.
+            require_manual_clip_edits()
 
         task_service = TaskService(db)
         await _require_task_owner(request, task_service, db, task_id)

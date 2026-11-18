@@ -4,8 +4,9 @@
 The only video worker runs on another machine with a GPU (`deploy/wsl-worker/`), so:
 
 - media lives in a private Cloudflare R2 bucket (`MEDIA_STORAGE=s3`, see `docs/media-storage.md`);
-- `MANUAL_CLIP_EDITS_ENABLED=false`: trim, split, merge, caption edit, regenerate and the synchronous
-  preset export answer `403`, because they would encode video on this host;
+- `MANUAL_CLIP_EDITS_ENABLED=false`: trim, split, merge, caption edit, regenerate, the synchronous
+  preset export and applying task settings to existing clips answer `403`, because they would encode
+  video on this host (saving task settings for new clips still works);
 - PostgreSQL and Redis are published on `127.0.0.1:15432` / `127.0.0.1:16379` only and reach the
   worker through Tailscale.
 
@@ -72,7 +73,8 @@ tailscale serve status
 ```
 
 `--bg` keeps the configuration across reboots. From outside the tailnet, the VPS public IP must not
-answer on 5432, 6379, 15432 or 16379.
+answer on 15432 or 16379. (Other Dokploy apps on this host may publish 5432/6379 themselves; SupoClip
+publishes nothing on 0.0.0.0.)
 
 ### First account (sign-up stays off afterwards)
 
